@@ -11,6 +11,12 @@
     "res/img/image5.jpeg"
   ];
   const MAX_GALLERY_IMAGES = 20;
+  const MAX_EXPORT_BYTES = 2_000_000;
+  const TEMPLATE_FILES = [
+    "index.js", "light.css", "dark.css", "speedtest.js", "tabCollapsible.js",
+    "res/img/image1.jpg", "res/img/image2.jpeg", "res/img/image3.jpeg", "res/img/image4.jpg", "res/img/image5.jpeg",
+    "res/img/instr/instr1.jpg", "res/img/instr/instr2.jpeg", "res/img/instr/instr3.jpeg"
+  ];
   const DEFAULTS = {
     portalName: "Prepaid Wi-Fi Access",
     headline: "Get connected.",
@@ -67,7 +73,10 @@
   let dirty = false;
   let saveTimer = 0;
   let toastTimer = 0;
+  let sizeCheckTimer = 0;
   let previewDark = false;
+  const templateAssets = new Map();
+  let sizeCheckSequence = 0;
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -163,6 +172,7 @@
   function scheduleSave() {
     if (!currentProject) return;
     setDirty(true);
+    queueExportSizeCheck();
   }
 
   function renderDashboard() {
@@ -283,6 +293,7 @@
     setPreviewThemeButton();
     setDirty(false);
     updatePreview();
+    queueExportSizeCheck();
     window.scrollTo(0, 0);
   }
 
@@ -304,6 +315,7 @@
       else input.value = value ?? "";
     });
     $("#accent-hex").textContent = settings.accentColor.toUpperCase();
+    $("#speedtest-preauth-help").hidden = !settings.showSpeedtest;
   }
 
   function renderPlanRows() {
@@ -664,35 +676,105 @@
     button.innerHTML = previewDark ? '<span aria-hidden="true">☾</span> Preview light mode' : '<span aria-hidden="true">☼</span> Preview dark mode';
   }
 
+  function queueExportSizeCheck() {
+    window.clearTimeout(sizeCheckTimer);
+    sizeCheckTimer = window.setTimeout(updateExportSizeStatus, 180);
+  }
+
+  async function loadTemplateAsset(path) {
+    if (templateAssets.has(path)) return templateAssets.get(path);
+    const response = await fetch(`template/${path}`);
+    if (!response.ok) throw new Error(`Could not load template file: ${path}`);
+    const data = new Uint8Array(await response.arrayBuffer());
+    templateAssets.set(path, data);
+    return data;
+  }
+
+  async function buildExportFiles() {
+    const doc = new DOMParser().parseFromString(templateHtml, "text/html");
+    const customImages = currentProject.images.flatMap((image, index) => {
+      if (!image.src.startsWith("data:")) return [];
+      return [{ path: getImageSource(image, index, false), data: dataUrlBytes(image.src) }];
+    });
+    applySettingsToDocument(doc, currentProject.settings.themeMode, false);
+    if (!currentProject.settings.showSpeedtest) {
+      doc.querySelector('script[src="speedtest.js"]')?.remove();
+    }
+
+    const customizedHtml = `<!doctype html>\n${doc.documentElement.outerHTML}`;
+    const files = [{ path: "index.html", data: new TextEncoder().encode(customizedHtml) }];
+    const referencedPaths = new Set();
+    doc.querySelectorAll("img[src],script[src],link[rel='stylesheet'][href]").forEach(element => {
+      const path = element.getAttribute("src") || element.getAttribute("href");
+      if (path && !path.startsWith("data:") && !path.startsWith("http")) {
+        referencedPaths.add(path.replace(/^\.\//, "").split("?")[0]);
+      }
+    });
+
+    for (const path of TEMPLATE_FILES) {
+      if (referencedPaths.has(path)) {
+        files.push({ path, data: await loadTemplateAsset(path) });
+      }
+    }
+    files.push(...customImages);
+    return files;
+  }
+
+  function zipSizeBytes(files) {
+    const encoder = new TextEncoder();
+    return 22 + files.reduce((total, file) => {
+      const filenameBytes = encoder.encode(file.path).byteLength;
+      return total + file.data.byteLength + 30 + filenameBytes + 46 + filenameBytes;
+    }, 0);
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1000) return `${bytes} bytes`;
+    if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(1)} KB`;
+    return `${(bytes / 1_000_000).toFixed(2)} MB`;
+  }
+
+  async function updateExportSizeStatus() {
+    if (!currentProject || !templateHtml) return;
+    const sequence = ++sizeCheckSequence;
+    const status = $("#export-size-status");
+    const bar = $("#export-size-bar");
+    const button = $("#export-button");
+    status.textContent = "Checking ZIP size…";
+    bar.classList.remove("warning", "error");
+    button.disabled = true;
+    try {
+      const files = await buildExportFiles();
+      const size = zipSizeBytes(files);
+      if (sequence !== sizeCheckSequence || !currentProject) return;
+      if (size >= MAX_EXPORT_BYTES) {
+        bar.classList.add("error");
+        status.textContent = `ZIP is ${formatBytes(size)}; it must be under 2 MB. Remove gallery images or replace large images with smaller, optimized files.`;
+        button.disabled = true;
+      } else {
+        status.textContent = `ZIP size: ${formatBytes(size)} of 2 MB limit · ready to export.`;
+        button.disabled = false;
+      }
+    } catch (error) {
+      if (sequence !== sizeCheckSequence) return;
+      bar.classList.add("error");
+      status.textContent = `Could not check export size: ${error.message}`;
+      button.disabled = true;
+    }
+  }
+
   async function exportProject() {
     if (!currentProject || !templateHtml) return;
     const button = $("#export-button");
     button.disabled = true;
     button.textContent = "Preparing ZIP…";
     try {
-      const doc = new DOMParser().parseFromString(templateHtml, "text/html");
-      const customImages = currentProject.images.flatMap((image, index) => {
-        if (!image.src.startsWith("data:")) return [];
-        return [{ path: getImageSource(image, index, false), data: dataUrlBytes(image.src) }];
-      });
-      applySettingsToDocument(doc, currentProject.settings.themeMode, false);
-      if (!currentProject.settings.showSpeedtest) {
-        doc.querySelector('script[src="speedtest.js"]')?.remove();
-      }
-      const customizedHtml = `<!doctype html>\n${doc.documentElement.outerHTML}`;
-      const files = [
-        { path: "index.html", data: new TextEncoder().encode(customizedHtml) },
-        ...customImages
-      ];
-      const templateFiles = [
-        "index.js", "light.css", "dark.css", "speedtest.js", "tabCollapsible.js",
-        "res/img/image1.jpg", "res/img/image2.jpeg", "res/img/image3.jpeg", "res/img/image4.jpg", "res/img/image5.jpeg",
-        "res/img/instr/instr1.jpg", "res/img/instr/instr2.jpeg", "res/img/instr/instr3.jpeg"
-      ];
-      for (const path of templateFiles) {
-        const response = await fetch(`template/${path}`);
-        if (!response.ok) throw new Error(`Could not load template file: ${path}`);
-        files.push({ path, data: new Uint8Array(await response.arrayBuffer()) });
+      const files = await buildExportFiles();
+      const size = zipSizeBytes(files);
+      if (size >= MAX_EXPORT_BYTES) {
+        $("#export-size-bar").classList.add("error");
+        $("#export-size-status").textContent = `ZIP is ${formatBytes(size)}; it must be under 2 MB. Remove gallery images or replace large images with smaller, optimized files.`;
+        throw new Error("The portal ZIP exceeds the 2 MB limit.");
       }
       const blob = makeZip(files);
       const url = URL.createObjectURL(blob);
@@ -706,8 +788,8 @@
     } catch (error) {
       showToast(`Could not export portal: ${error.message}`, true);
     } finally {
-      button.disabled = false;
       button.innerHTML = '<span aria-hidden="true">↓</span> Export ZIP';
+      queueExportSizeCheck();
     }
   }
 
@@ -845,6 +927,9 @@
     input.addEventListener(input.type === "checkbox" || input.tagName === "SELECT" || input.type === "color" ? "change" : "input", () => {
       const field = input.dataset.field;
       currentProject.settings[field] = input.type === "checkbox" ? input.checked : input.value;
+      if (field === "showSpeedtest") {
+        $("#speedtest-preauth-help").hidden = !input.checked;
+      }
       if (field === "accentColor") {
         syncAccent();
         renderPresets();
@@ -878,6 +963,14 @@
     previewDark = !previewDark;
     setPreviewThemeButton();
     updatePreview();
+  });
+  $("#copy-preauth-domains").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText("speed.cloudflare.com\nipwho.is");
+      showToast("Pre-authentication domains copied.");
+    } catch (error) {
+      showToast(`Could not copy domains: ${error.message}`, true);
+    }
   });
 
   initialize();

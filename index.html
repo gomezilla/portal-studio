@@ -65,6 +65,9 @@
           <button class="button button-primary" id="export-button" type="button"><span aria-hidden="true">↓</span> Export ZIP</button>
         </div>
       </div>
+      <div class="export-size-bar" id="export-size-bar" role="status" aria-live="polite">
+        <span class="size-indicator"></span><span id="export-size-status">Preparing ZIP size check…</span>
+      </div>
       <div class="editor-body">
         <aside class="settings-panel" aria-label="Portal customization">
           <div class="settings-tabs" role="tablist" aria-label="Customization sections">
@@ -111,6 +114,13 @@
               <div class="field-toggle">
                 <div><strong>Speed test card</strong><span>Show live upload and download speeds</span></div>
                 <label class="switch"><input type="checkbox" data-field="showSpeedtest" aria-label="Show speed test card"><span></span></label>
+              </div>
+              <div class="preauth-help" id="speedtest-preauth-help">
+                <strong>Allow speed-test services in Omada</strong>
+                <p>With Speed test enabled, add both domains to <b>Omada Controller → Portal → Access Control → Pre-authentication Access</b> so guests can run the test before signing in.</p>
+                <code>speed.cloudflare.com</code>
+                <code>ipwho.is</code>
+                <button class="text-button" id="copy-preauth-domains" type="button">Copy domains</button>
               </div>
               <div class="field-toggle">
                 <div><strong>Plans &amp; pricing</strong><span>Show the expandable plan table</span></div>

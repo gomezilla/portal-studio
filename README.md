@@ -6,6 +6,14 @@ A browser-based editor for the supplied Omada captive-portal template. Portal dr
 
 The gallery can contain up to 20 slides. Add JPG, PNG, GIF, or WebP images (up to 5 MB each), replace any slide, or remove stock and uploaded images. The first three looks are Material You, Facebook-inspired, and Gaming / Neon; Ocean, Sunset, Forest, Midnight, and Rose are also included.
 
+## Speed-test access
+
+The speed-test card can be enabled or disabled in the editor. When enabled, add both `speed.cloudflare.com` and `ipwho.is` to **Omada Controller → Portal → Access Control → Pre-authentication Access** so visitors can run the test before authentication. Disabling the card also removes the speed-test script from the exported portal.
+
+## Export size
+
+The editor calculates the actual ZIP archive size and allows export only when it is below 2,000,000 bytes (2 MB). Removing unused gallery slides reduces the ZIP; replacing large photos with smaller, optimized JPG or WebP images can reduce it further.
+
 ## Run locally
 
 From this directory, start a local static server:
@@ -33,3 +41,7 @@ Live site: [https://gomezilla.github.io/portal-studio/](https://gomezilla.github
 Source: [github.com/gomezilla/portal-studio](https://github.com/gomezilla/portal-studio)
 
 Drafts remain in each visitor's browser and are not shared across devices.
+
+## Account quotas and approval workflow
+
+The current site stores drafts in each visitor's browser. A secure one-template-per-account quota and administrator approval for additional templates require a configured Supabase project and authenticated accounts; a browser-only limit would be bypassable. This workflow is not enabled until the project is provisioned and its public URL/key are configured. Never put a Supabase service-role key in the website.
