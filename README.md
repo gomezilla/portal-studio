@@ -28,4 +28,8 @@ The files in `template/` are bundled from the supplied `omada-portal-template` f
 
 ## GitHub Pages
 
-This is a static website and can be hosted from the repository root on GitHub Pages. Drafts remain in each visitor's browser and are not shared across devices.
+Live site: [https://gomezilla.github.io/portal-studio/](https://gomezilla.github.io/portal-studio/)
+
+Source: [github.com/gomezilla/portal-studio](https://github.com/gomezilla/portal-studio)
+
+Drafts remain in each visitor's browser and are not shared across devices.
