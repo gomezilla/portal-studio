@@ -323,5 +323,7 @@ for delete to authenticated using (
   bucket_id = 'portal-images' and (storage.foldername(name))[1] = auth.uid()::text
 );
 
--- After signing in once with the administrator account, register its verified email:
--- insert into public.portal_admins(email) values ('REPLACE_WITH_ADMIN_EMAIL');
+-- Sign in once with this verified email before running this schema.
+insert into public.portal_admins(email)
+values ('christianzemog@gmail.com')
+on conflict (email) do nothing;

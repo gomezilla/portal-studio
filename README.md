@@ -49,8 +49,8 @@ The app uses Supabase email magic-link authentication, private image storage, da
 To activate account saving and approvals for a Supabase project:
 
 1. In Supabase **SQL Editor**, run [`supabase/schema.sql`](./supabase/schema.sql).
-2. In that SQL file's final statement, replace `REPLACE_WITH_ADMIN_EMAIL` with the administrator's verified email and run the statement. This keeps the admin address out of the public app configuration.
+2. Before running the schema, sign in once with the verified administrator account `christianzemog@gmail.com`. The schema's final statement registers this address as an administrator and is safe to run again.
 3. In **Authentication → URL Configuration**, set the site URL to `https://gomezilla.github.io/portal-studio/` and add it to the redirect URLs.
 4. Enable email sign-in/magic links. Users need a verified account to save or export. If the schema or auth setup is incomplete, account saving/export remain unavailable rather than falling back to an insecure client-side quota.
 
-Each approved request grants that account one additional saved portal and one additional export. The administrator reviews pending requests in the dashboard. The 2 MB ZIP limit is separate from the per-account export allowance.
+Each approved request grants that account one additional saved portal and one additional export. The administrator reviews pending requests in the dashboard. Approval decisions currently appear in the dashboard; the app does not send email notifications for new requests or approval results. The 2 MB ZIP limit is separate from the per-account export allowance.
