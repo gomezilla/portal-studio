@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#f3f6fb">
+        <title>Prepaid Wi-Fi Access</title>
+        <link rel="stylesheet" href="light.css" media="(prefers-color-scheme: light)">
+        <link rel="stylesheet" href="dark.css" media="(prefers-color-scheme: dark)">
+    </head>
+    <body class="portal">
+        <main class="oper-section-outer">
+            <div class="oper-section-inner">
+                <div class="container">
+                    <header class="header">
+                        <div class="header-top-row">
+                            <div class="portal-badge"><span class="status-dot" aria-hidden="true"></span>Prepaid Wi-Fi Access</div>
+                        </div>
+                        <h1 class="portal-title">Get connected.</h1>
+                        <p class="portal-subtitle">Your connection, ready when you are.</p>
+                    </header>
+
+                    <div class="portal-grid">
+                        <section class="visual-column" aria-label="Network information">
+                            <div class="carousel" aria-label="Community gallery">
+                                <img id="carouselImage1" class="carouselImage" src="res/img/image1.jpg" alt="Community and Wi-Fi access">
+                                <img id="carouselImage2" class="carouselImage" src="res/img/image2.jpeg" alt="Community and Wi-Fi access" style="display: none;">
+                                <img id="carouselImage3" class="carouselImage" src="res/img/image3.jpeg" alt="Community and Wi-Fi access" style="display: none;">
+                                <img id="carouselImage4" class="carouselImage" src="res/img/image4.jpg" alt="Community and Wi-Fi access" style="display: none;">
+                                <img id="carouselImage5" class="carouselImage" src="res/img/image5.jpeg" alt="Community and Wi-Fi access" style="display: none;">
+                                <div class="image-caption">
+                                    <span class="caption-eyebrow">YOUR LOCAL CONNECTION</span>
+                                    <span class="caption-title">Wi-Fi made simple</span>
+                                </div>
+                            </div>
+
+                            <section class="speed-card" aria-labelledby="speedtest-title">
+                                <div class="speed-heading">
+                                    <div>
+                                        <p class="section-eyebrow">NETWORK CHECK</p>
+                                        <h2 id="speedtest-title">Internet speed</h2>
+                                    </div>
+                                    <span class="speed-live"><span class="live-dot" aria-hidden="true"></span>LIVE TEST</span>
+                                </div>
+                                <div class="speed-results">
+                                    <div class="speed-result upload-result">
+                                        <span class="speed-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>
+                                        </span>
+                                        <div>
+                                            <span class="speed-label">Upload</span>
+                                            <p class="speed-value"><span id="upload-speed">--</span><span class="speed-unit">Mbps</span></p>
+                                        </div>
+                                    </div>
+                                    <div class="speed-divider" aria-hidden="true"></div>
+                                    <div class="speed-result download-result">
+                                        <span class="speed-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24"><path d="M12 5v14m6-6-6 6-6-6"/></svg>
+                                        </span>
+                                        <div>
+                                            <span class="speed-label">Download</span>
+                                            <p class="speed-value"><span id="download-speed">--</span><span class="speed-unit">Mbps</span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p id="speedtest-status" class="speed-status" role="status" aria-live="polite">Starting automatic speed test…</p>
+                                <div class="speed-footer">
+                                    <p class="speed-disclaimer">One test uses about 3 MB; ISP lookup uses your public IP.</p>
+                                    <p class="isp-line">ISP <span id="isp-name">Detecting…</span></p>
+                                </div>
+                            </section>
+                        </section>
+
+                        <section class="access-column" aria-label="Connect to Wi-Fi">
+                            <div id="hotspot-section" style="display:none">
+                                <label class="field-label" for="hotspot-selector">Access method</label>
+                                <div class="custom-select">
+                                    <select id="hotspot-selector" class="oper-section-item"></select>
+                                </div>
+                            </div>
+
+                            <form id="login-form">
+                                <div id="input-voucher" class="form-group" style="display:none">
+                                    <label class="field-label" for="voucherCode">Voucher code</label>
+                                    <input id="voucherCode" class="oper-section-item input" name="voucherCode" type="text" placeholder="Enter your voucher code" autocomplete="one-time-code">
+                                </div>
+                                <div id="input-user" class="form-group" style="display:none">
+                                    <label class="field-label" for="username">Username</label>
+                                    <input id="username" class="oper-section-item input" name="username" type="text" placeholder="Username" autocomplete="username">
+                                </div>
+                                <div id="input-password" class="form-group password-wrapper" style="display:none">
+                                    <label class="field-label" for="password">Password</label>
+                                    <input id="password" class="oper-section-item input" name="password" type="password" placeholder="Password" autocomplete="current-password">
+                                    <button id="togglePassword" class="password-toggle" type="button" aria-controls="password" aria-pressed="false">Show</button>
+                                </div>
+                                <div id="input-simple" class="form-group" style="display:none">
+                                    <label class="field-label" for="simplePassword">Wi-Fi password</label>
+                                    <input id="simplePassword" class="password oper-section-item" name="simplePassword" type="password" placeholder="Enter Wi-Fi password">
+                                </div>
+                                <div id="input-phone-num" class="form-group" style="display:none">
+                                    <label class="field-label" for="country-code">Country code</label>
+                                    <span class="add"></span>
+                                    <input id="country-code" class="input" placeholder="Country code">
+                                </div>
+                                <div id="input-phone-number" class="form-group" style="display:none">
+                                    <label class="field-label" for="phone-number">Phone number</label>
+                                    <input id="phone-number" class="input" name="phone-number" type="text" placeholder="Phone number" autocomplete="tel">
+                                </div>
+                                <div id="input-verify-code" class="form-group" style="display:none">
+                                    <label class="field-label" for="verify-code">Verification code</label>
+                                    <div class="verify-row">
+                                        <input id="verify-code" class="input" name="verify-code" type="text" placeholder="Verification code">
+                                        <button id="get-code" class="button" type="button">Get code</button>
+                                    </div>
+                                </div>
+                                <input name="clientMac" id="cMac" style="display:none">
+                                <input name="radiusSvrIp" id="radiusServerIp" style="display:none">
+                            </form>
+
+                            <span id="oper-hint" role="status" style="color: var(--error)"></span>
+                            <div id="button-area" class="form-group">
+                                <button id="button-login" class="button oper-section-item"><span class="login-button-label">Connect to Wi-Fi</span></button>
+                            </div>
+
+                            <button class="collapsible" type="button" aria-expanded="false">Plans &amp; pricing<i class="arrow" aria-hidden="true"></i></button>
+                            <div class="content">
+                                <table id="priceTable">
+                                    <thead>
+                                        <tr><th>Price</th><th>Duration</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td>₱5</td><td>2 hours</td></tr>
+                                        <tr><td>₱10</td><td>5 hours</td></tr>
+                                        <tr><td>₱20</td><td>1 day</td></tr>
+                                        <tr><td>₱55</td><td>3 days</td></tr>
+                                        <tr><td>₱105</td><td>7 days</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <button class="collapsible" type="button" aria-expanded="false">How to connect <span class="secondary-label">(Paano kumonekta)</span><i class="arrow" aria-hidden="true"></i></button>
+                            <div class="content">
+                                <p>1. Open Wi-Fi settings and connect to <strong>Prepaid Hotspot</strong> or <strong>Prepaid Hotspot_2.4G</strong>.</p>
+                                <img src="res/img/instr/instr1.jpg" alt="Wi-Fi network selection instructions">
+                                <p>2. Select <strong>Voucher Access</strong>.</p>
+                                <img src="res/img/instr/instr2.jpeg" alt="Voucher access instructions">
+                                <p>3. Enter your voucher code and tap <strong>Connect to Wi-Fi</strong>.</p>
+                                <img src="res/img/instr/instr3.jpeg" alt="Voucher code entry instructions">
+                            </div>
+                            <p class="notes" id="note1">Hourly plans pause automatically when you disconnect.</p>
+                        </section>
+                    </div>
+                    <footer class="footer-note">Secure access · Simple prepaid plans</footer>
+                </div>
+            </div>
+        </main>
+        <script src="tabCollapsible.js"></script>
+        <script src="index.js"></script>
+        <script src="speedtest.js"></script>
+    </body>
+</html>

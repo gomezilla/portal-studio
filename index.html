@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6fa">
+  <title>Portal Studio</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" id="brand-home" aria-label="Portal Studio dashboard">
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span>portal<span class="brand-light">studio</span></span>
+    </a>
+    <div class="topbar-right">
+      <span class="save-indicator" id="save-indicator"><i></i> All changes saved</span>
+      <button class="button button-quiet" id="dashboard-button" type="button">My portals</button>
+      <button class="button button-primary" id="top-save-button" type="button" hidden>Save draft</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="dashboard page-view" id="dashboard-view">
+      <div class="dashboard-heading">
+        <div>
+          <p class="eyebrow">YOUR WORKSPACE</p>
+          <h1>Your portals, your way.</h1>
+          <p class="muted">Design a Wi-Fi welcome page, save drafts, and export it for Omada.</p>
+        </div>
+        <button class="button button-primary button-large" id="create-button" type="button"><span aria-hidden="true">＋</span> Create a portal</button>
+      </div>
+      <div class="template-banner">
+        <div class="banner-icon" aria-hidden="true">✦</div>
+        <div>
+          <strong>Start with the Omada standard template</strong>
+          <p>Every export includes the original portal files and keeps Omada authentication working.</p>
+        </div>
+        <span class="template-tag">OMADA READY</span>
+      </div>
+      <div class="library-heading">
+        <div><h2>Saved portals</h2><span id="portal-count" class="count-label">0 drafts</span></div>
+        <span class="muted small">Saved privately in this browser</span>
+      </div>
+      <div class="portal-list" id="portal-list"></div>
+      <div class="empty-state" id="empty-state" hidden>
+        <div class="empty-illustration" aria-hidden="true"><span>✦</span></div>
+        <h3>Your next great welcome page starts here.</h3>
+        <p>Create a portal to customize the copy, images, and colors. Your drafts stay on this device.</p>
+        <button class="button button-primary" id="empty-create-button" type="button">Create your first portal</button>
+      </div>
+      <p class="privacy-note"><span aria-hidden="true">◈</span> Drafts and uploaded images are stored locally in this browser. Nothing is sent to a server.</p>
+    </section>
+
+    <section class="editor page-view" id="editor-view" hidden>
+      <div class="editor-heading">
+        <button class="back-button" id="back-button" type="button"><span aria-hidden="true">←</span> All portals</button>
+        <div class="editor-title-wrap">
+          <input class="project-name" id="project-name" aria-label="Portal draft name" maxlength="70">
+          <span class="draft-tag">DRAFT</span>
+        </div>
+        <div class="editor-actions">
+          <button class="button button-quiet" id="editor-save-button" type="button">Save draft</button>
+          <button class="button button-primary" id="export-button" type="button"><span aria-hidden="true">↓</span> Export ZIP</button>
+        </div>
+      </div>
+      <div class="editor-body">
+        <aside class="settings-panel" aria-label="Portal customization">
+          <div class="settings-tabs" role="tablist" aria-label="Customization sections">
+            <button class="settings-tab active" role="tab" aria-selected="true" aria-controls="content-panel" id="content-tab" data-panel="content-panel">Content</button>
+            <button class="settings-tab" role="tab" aria-selected="false" aria-controls="style-panel" id="style-tab" data-panel="style-panel">Style</button>
+            <button class="settings-tab" role="tab" aria-selected="false" aria-controls="images-panel" id="images-tab" data-panel="images-panel">Images</button>
+          </div>
+          <div class="settings-scroll">
+            <section class="settings-section tab-panel" id="content-panel" role="tabpanel" aria-labelledby="content-tab">
+              <div class="section-intro">
+                <span class="step-number">01</span>
+                <div><h2>Make it yours</h2><p>Welcome visitors with your own words.</p></div>
+              </div>
+              <label class="field">Portal name <input data-field="portalName" maxlength="60" placeholder="Prepaid Wi-Fi Access"></label>
+              <label class="field">Main headline <input data-field="headline" maxlength="80" placeholder="Get connected."></label>
+              <label class="field">Subheading <textarea data-field="subheading" maxlength="150" rows="2" placeholder="Your connection, ready when you are."></textarea></label>
+              <div class="field-row">
+                <label class="field">Image eyebrow <input data-field="captionEyebrow" maxlength="50" placeholder="YOUR LOCAL CONNECTION"></label>
+                <label class="field">Image caption <input data-field="captionTitle" maxlength="60" placeholder="Wi-Fi made simple"></label>
+              </div>
+              <div class="subsection-heading"><h3>Network card labels</h3></div>
+              <label class="field">Speed card heading <input data-field="speedTitle" maxlength="50"></label>
+              <label class="field">Small card label <input data-field="speedEyebrow" maxlength="40"></label>
+              <label class="field">Live test badge <input data-field="speedLiveLabel" maxlength="24"></label>
+              <div class="field-row">
+                <label class="field">Upload label <input data-field="uploadLabel" maxlength="24"></label>
+                <label class="field">Download label <input data-field="downloadLabel" maxlength="24"></label>
+              </div>
+              <label class="field">Speed card note <input data-field="speedDisclaimer" maxlength="100"></label>
+              <label class="field">ISP label <input data-field="ispLabel" maxlength="20"></label>
+              <label class="field">Connect button <input data-field="buttonLabel" maxlength="40" placeholder="Connect to Wi-Fi"></label>
+              <label class="field">Footer message <input data-field="footer" maxlength="100" placeholder="Secure access · Simple prepaid plans"></label>
+              <label class="field">Plan table title <input data-field="plansTitle" maxlength="50" placeholder="Plans & pricing"></label>
+              <div class="field-row">
+                <label class="field">First column <input data-field="priceHeading" maxlength="30" placeholder="Price"></label>
+                <label class="field">Second column <input data-field="durationHeading" maxlength="30" placeholder="Duration"></label>
+              </div>
+              <label class="field">Connection guide title <input data-field="guideTitle" maxlength="50" placeholder="How to connect"></label>
+              <label class="field">Guide secondary label <input data-field="guideSecondaryLabel" maxlength="45" placeholder="(Paano kumonekta)"></label>
+              <label class="field">Step 1 <textarea data-field="guideStep1" maxlength="180" rows="2"></textarea></label>
+              <label class="field">Step 2 <textarea data-field="guideStep2" maxlength="180" rows="2"></textarea></label>
+              <label class="field">Step 3 <textarea data-field="guideStep3" maxlength="180" rows="2"></textarea></label>
+              <label class="field">Small note <textarea data-field="note" maxlength="140" rows="2" placeholder="Hourly plans pause automatically when you disconnect."></textarea></label>
+              <div class="field-toggle">
+                <div><strong>Speed test card</strong><span>Show live upload and download speeds</span></div>
+                <label class="switch"><input type="checkbox" data-field="showSpeedtest" aria-label="Show speed test card"><span></span></label>
+              </div>
+              <div class="field-toggle">
+                <div><strong>Plans &amp; pricing</strong><span>Show the expandable plan table</span></div>
+                <label class="switch"><input type="checkbox" data-field="showPlans" aria-label="Show plans and pricing"><span></span></label>
+              </div>
+              <div class="field-toggle">
+                <div><strong>How-to guide</strong><span>Show connection instructions</span></div>
+                <label class="switch"><input type="checkbox" data-field="showGuide" aria-label="Show how-to guide"><span></span></label>
+              </div>
+              <div class="subsection-heading"><h3>Plan rows</h3><button class="text-button" id="add-plan-button" type="button">＋ Add row</button></div>
+              <div id="plan-rows" class="plan-rows"></div>
+            </section>
+
+            <section class="settings-section tab-panel" id="style-panel" role="tabpanel" aria-labelledby="style-tab" hidden>
+              <div class="section-intro">
+                <span class="step-number">02</span>
+                <div><h2>Set the mood</h2><p>Pick a starting point, then fine-tune it.</p></div>
+              </div>
+              <div class="field">
+                <span class="field-label">Choose a look</span>
+                <div class="preset-grid" id="preset-grid" role="radiogroup" aria-label="Color and style preset"></div>
+              </div>
+              <label class="field color-field">Brand color <span class="color-control"><input type="color" data-field="accentColor" aria-label="Choose brand color"><span id="accent-hex">#6750A4</span></span></label>
+              <label class="field">Color mode
+                <select data-field="themeMode">
+                  <option value="system">Auto · match device</option>
+                  <option value="light">Always light</option>
+                  <option value="dark">Always dark</option>
+                </select>
+                <span class="field-help">Auto mode switches between light and dark with the visitor's device.</span>
+              </label>
+              <label class="field">Corner style
+                <select data-field="cornerStyle">
+                  <option value="soft">Soft · rounded</option>
+                  <option value="rounded">Round · friendly</option>
+                  <option value="sharp">Sharp · minimal</option>
+                </select>
+              </label>
+              <div class="preview-hint"><span aria-hidden="true">✦</span><p>Changes update the live preview. Try the preview theme button to check both color modes.</p></div>
+            </section>
+
+            <section class="settings-section tab-panel" id="images-panel" role="tabpanel" aria-labelledby="images-tab" hidden>
+              <div class="section-intro">
+                <span class="step-number">03</span>
+                <div><h2>Tell your story</h2><p>Replace any slide in the rotating gallery.</p></div>
+              </div>
+              <p class="images-note">Use JPG, PNG, GIF, or WebP images up to 5 MB each. Your original images are preserved unless replaced.</p>
+              <button class="button button-quiet add-image-button" id="add-gallery-image-button" type="button">＋ Add gallery image</button>
+              <input id="gallery-image-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+              <p class="gallery-count" id="gallery-count" aria-live="polite"></p>
+              <div class="image-slots" id="image-slots"></div>
+            </section>
+          </div>
+          <div class="panel-footer"><span class="omada-mark">◉</span> Built on the Omada standard portal</div>
+        </aside>
+
+        <section class="preview-area" aria-label="Live portal preview">
+          <div class="preview-toolbar">
+            <div class="preview-heading"><span class="live-indicator"></span><strong>Live preview</strong><span class="preview-device">Desktop</span></div>
+            <button class="theme-preview-button" id="theme-preview-button" type="button"><span aria-hidden="true">☼</span> Preview dark mode</button>
+          </div>
+          <div class="preview-canvas">
+            <div class="browser-frame">
+              <div class="browser-top"><span class="traffic-lights"><i></i><i></i><i></i></span><span class="address-bar">welcome.portal</span><span class="frame-menu">•••</span></div>
+              <iframe id="portal-preview" title="Live preview of your Omada Wi-Fi portal"></iframe>
+            </div>
+            <p class="preview-caption">Preview only · Authentication activates when deployed to your Omada controller.</p>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
