@@ -8,12 +8,17 @@
     "res/img/image4.jpg",
     "res/img/image5.jpeg"
   ];
+  const GUIDE_IMAGE_PATHS = [
+    "res/img/instr/instr1.jpg",
+    "res/img/instr/instr2.jpeg",
+    "res/img/instr/instr3.jpeg"
+  ];
   const MAX_GALLERY_IMAGES = 20;
   const MAX_EXPORT_BYTES = 2_000_000;
   const TEMPLATE_FILES = [
     "index.js", "light.css", "dark.css", "speedtest.js", "tabCollapsible.js",
     "res/img/image1.jpg", "res/img/image2.jpeg", "res/img/image3.jpeg", "res/img/image4.jpg", "res/img/image5.jpeg",
-    "res/img/instr/instr1.jpg", "res/img/instr/instr2.jpeg", "res/img/instr/instr3.jpeg"
+    ...GUIDE_IMAGE_PATHS
   ];
   const DEFAULTS = {
     portalName: "Prepaid Wi-Fi Access",
@@ -101,12 +106,91 @@
       createdAt: now,
       updatedAt: now,
       settings: JSON.parse(JSON.stringify(DEFAULTS)),
-      images: IMAGE_PATHS.map(path => ({ src: path, name: path.split("/").pop() }))
+      images: IMAGE_PATHS.map(path => ({ src: path, name: path.split("/").pop() })),
+      guideImages: GUIDE_IMAGE_PATHS.map(path => ({ src: path, name: path.split("/").pop() }))
     };
+  }
+
+  function renderGuideImageSlots() {
+    const list = $("#guide-image-slots");
+    list.replaceChildren();
+    currentProject.guideImages.forEach((image, index) => {
+      const row = document.createElement("div");
+      row.className = "guide-image-slot";
+      const title = document.createElement("strong");
+      title.textContent = `Step ${index + 1} image`;
+      const preview = document.createElement("img");
+      preview.className = "guide-image-thumb";
+      preview.alt = image ? `Connection guide step ${index + 1}` : "";
+      preview.hidden = !image;
+      if (image) preview.src = image.src.startsWith("data:") ? image.src : `template/${image.src}`;
+      const actions = document.createElement("div");
+      actions.className = "image-buttons";
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/jpeg,image/png,image/gif,image/webp";
+      input.hidden = true;
+      const choose = document.createElement("button");
+      choose.type = "button";
+      choose.className = "image-action";
+      choose.textContent = image ? "Replace image" : "Add image";
+      choose.addEventListener("click", () => input.click());
+      input.addEventListener("change", () => handleGuideImageFile(input, index));
+      actions.append(choose);
+      if (image) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "image-action remove";
+        remove.textContent = "Remove";
+        remove.setAttribute("aria-label", `Remove step ${index + 1} image`);
+        remove.addEventListener("click", () => {
+          currentProject.guideImages[index] = null;
+          renderGuideImageSlots();
+          scheduleSave();
+          updatePreview();
+          showToast(`Step ${index + 1} image removed.`);
+        });
+        actions.append(remove);
+      }
+      row.append(title, preview, actions, input);
+      list.append(row);
+    });
+  }
+
+  function handleGuideImageFile(input, index) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type)) {
+      showToast("Choose a JPG, PNG, GIF, or WebP image.", true);
+      input.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("Images must be 5 MB or smaller.", true);
+      input.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => showToast("Could not read this guide image file.", true);
+    reader.onload = () => {
+      currentProject.guideImages[index] = { src: reader.result, name: file.name };
+      renderGuideImageSlots();
+      scheduleSave();
+      updatePreview();
+      showToast(`Step ${index + 1} image updated.`);
+    };
+    reader.readAsDataURL(file);
   }
 
   function makeId() {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+  }
+
+  function getGuideImageSource(image, index, forPreview) {
+    if (forPreview || !image.src.startsWith("data:")) return image.src;
+    const extension = image.src.match(/^data:image\/(jpeg|png|gif|webp);/i)?.[1]?.replace("jpeg", "jpg");
+    if (!extension) throw new Error(`Guide image ${index + 1} has an unsupported image format.`);
+    return `res/img/instr/custom-guide-step-${index + 1}.${extension}`;
   }
 
   function showToast(message, isError = false) {
@@ -257,7 +341,7 @@
   }
 
   async function hydrateCloudImages(project) {
-    for (const image of project.images) {
+    for (const image of [...project.images, ...project.guideImages].filter(Boolean)) {
       if (!image?.src?.startsWith("storage://")) continue;
       const path = image.src.slice("storage://".length);
       const { data, error } = await supabaseClient.storage.from("portal-images").download(path);
@@ -280,19 +364,23 @@
     if (!currentUser || !quota) throw new Error("Sign in and load your account quota before saving.");
     const payload = JSON.parse(JSON.stringify(project));
     const folder = `${currentUser.id}/${safeFilename(project.id)}`;
-    for (let index = 0; index < payload.images.length; index += 1) {
-      const image = payload.images[index];
-      if (!image?.src.startsWith("data:")) continue;
-      const path = `${folder}/slide-${index + 1}`;
-      const blob = await (await fetch(image.src)).blob();
-      const { error: uploadError } = await supabaseClient.storage.from("portal-images").upload(path, blob, {
-        upsert: true,
-        contentType: blob.type
-      });
-      if (uploadError) throw uploadError;
-      image.src = `storage://${path}`;
-    }
-    const retainedPaths = new Set(payload.images
+    const uploadImages = async (images, filename) => {
+      for (let index = 0; index < images.length; index += 1) {
+        const image = images[index];
+        if (!image?.src.startsWith("data:")) continue;
+        const path = `${folder}/${filename(index)}`;
+        const blob = await (await fetch(image.src)).blob();
+        const { error: uploadError } = await supabaseClient.storage.from("portal-images").upload(path, blob, {
+          upsert: true,
+          contentType: blob.type
+        });
+        if (uploadError) throw uploadError;
+        image.src = `storage://${path}`;
+      }
+    };
+    await uploadImages(payload.images, index => `slide-${index + 1}`);
+    await uploadImages(payload.guideImages, index => `guide-step-${index + 1}`);
+    const retainedPaths = new Set([...payload.images, ...payload.guideImages]
       .filter(image => image?.src.startsWith("storage://"))
       .map(image => image.src.slice("storage://".length)));
     const { data: storedImages, error: listError } = await supabaseClient.storage.from("portal-images").list(folder);
@@ -389,7 +477,13 @@
       createdAt: project.createdAt || new Date().toISOString(),
       updatedAt: project.updatedAt || new Date().toISOString(),
       settings,
-      images
+      images,
+      guideImages: Array.isArray(project.guideImages)
+        ? GUIDE_IMAGE_PATHS.map((path, index) => {
+          const image = project.guideImages[index];
+          return image && typeof image.src === "string" ? image : null;
+        })
+        : GUIDE_IMAGE_PATHS.map(path => ({ src: path, name: path.split("/").pop() }))
     };
   }
 
@@ -475,6 +569,7 @@
     syncAccent();
     renderPlanRows();
     renderImageSlots();
+    renderGuideImageSlots();
     renderPresets();
     previewDark = false;
     setPreviewThemeButton();
@@ -760,6 +855,15 @@
       [settings.guideStep1, settings.guideStep2, settings.guideStep3].forEach((text, index) => {
         if (steps[index]) steps[index].textContent = text;
       });
+      guideContent.querySelectorAll("img").forEach((image, index) => {
+        const guideImage = currentProject.guideImages[index];
+        if (!guideImage) {
+          image.remove();
+          return;
+        }
+        image.src = getGuideImageSource(guideImage, index, forPreview);
+        image.alt = `Connection guide step ${index + 1}`;
+      });
     }
 
     const visibility = [
@@ -904,6 +1008,10 @@
       if (!image.src.startsWith("data:")) return [];
       return [{ path: getImageSource(image, index, false), data: dataUrlBytes(image.src) }];
     });
+    const customGuideImages = currentProject.guideImages.flatMap((image, index) => {
+      if (!image?.src.startsWith("data:")) return [];
+      return [{ path: getGuideImageSource(image, index, false), data: dataUrlBytes(image.src) }];
+    });
     applySettingsToDocument(doc, currentProject.settings.themeMode, false);
     if (!currentProject.settings.showSpeedtest) {
       doc.querySelector('script[src="speedtest.js"]')?.remove();
@@ -924,7 +1032,7 @@
         files.push({ path, data: await loadTemplateAsset(path) });
       }
     }
-    files.push(...customImages);
+    files.push(...customImages, ...customGuideImages);
     return files;
   }
 
