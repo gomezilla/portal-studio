@@ -325,5 +325,5 @@ for delete to authenticated using (
 
 -- Sign in once with this verified email before running this schema.
 insert into public.portal_admins(email)
-values ('christianzemog@gmail.com')
+values ('chrsistianzemog@gmail.com')
 on conflict (email) do nothing;
