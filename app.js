@@ -1,8 +1,6 @@
 (() => {
   "use strict";
 
-  const STORE_NAME = "portals";
-  const DB_NAME = "portal-studio";
   const IMAGE_PATHS = [
     "res/img/image1.jpg",
     "res/img/image2.jpeg",
@@ -66,9 +64,17 @@
     { id: "midnight", name: "Midnight", light: ["#eff1f8", "#ffffff", "#f5f6fb", "#e9ebf5", "#20243a", "#73798f", "#dfe2ed"], dark: ["#111521", "#191f2e", "#202738", "#293147", "#eff2ff", "#a7aec3", "#323b52"], accent: "#5369cf", hover: "#4357b6", mode: "dark", corners: "sharp" },
     { id: "rose", name: "Rose", light: ["#f8f1f5", "#ffffff", "#fbf6f9", "#f2e7ee", "#332631", "#887984", "#ebdfe7"], dark: ["#201920", "#2b202b", "#342835", "#433443", "#f6edf4", "#bbaab9", "#493948"], accent: "#a34d78", hover: "#863c62", mode: "system", corners: "rounded" }
   ];
-  const database = openDatabase();
+  const supabaseConfig = window.PORTAL_STUDIO_SUPABASE || {};
+  const supabaseClient = window.supabase?.createClient && supabaseConfig.url && supabaseConfig.publishableKey
+    ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.publishableKey)
+    : null;
   let templateHtml = "";
   let currentProject = null;
+  let currentUser = null;
+  let quota = null;
+  let isAdmin = false;
+  let pendingRequest = null;
+  const remoteDraftIds = new Set();
   let projects = [];
   let dirty = false;
   let saveTimer = 0;
@@ -85,35 +91,6 @@
   const toast = $("#toast");
   const saveIndicator = $("#save-indicator");
   const previewFrame = $("#portal-preview");
-
-  function openDatabase() {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, 1);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME, { keyPath: "id" });
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error || new Error("Could not open browser storage."));
-    });
-  }
-
-  function storeRequest(mode, action, value) {
-    return database.then(db => new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, mode);
-      const request = action === "all" ? transaction.objectStore(STORE_NAME).getAll() :
-        action === "delete" ? transaction.objectStore(STORE_NAME).delete(value) :
-          transaction.objectStore(STORE_NAME).put(value);
-      let result;
-      request.onsuccess = () => { result = request.result; };
-      request.onerror = () => reject(request.error || new Error("Browser storage request failed."));
-      transaction.oncomplete = () => resolve(result);
-      transaction.onerror = () => reject(transaction.error || new Error("Could not write to browser storage."));
-      transaction.onabort = () => reject(transaction.error || new Error("Browser storage transaction was aborted."));
-    }));
-  }
 
   function freshProject() {
     const now = new Date().toISOString();
@@ -150,22 +127,24 @@
   }
 
   async function saveCurrentProject(silent = false) {
-    if (!currentProject) return;
+    if (!currentProject || !currentUser || !quota) return false;
     window.clearTimeout(saveTimer);
     currentProject.name = ($("#project-name").value.trim() || "Untitled Wi-Fi Portal").slice(0, 70);
     currentProject.updatedAt = new Date().toISOString();
     try {
-      await storeRequest("readwrite", "put", currentProject);
+      await persistCloudProject(currentProject);
       dirty = false;
       saveIndicator.classList.remove("unsaved");
       saveIndicator.lastChild.textContent = " All changes saved";
       renderDashboard();
       if (!silent) showToast("Draft saved on this device.");
+      return true;
     } catch (error) {
       dirty = true;
       saveIndicator.classList.add("unsaved");
       saveIndicator.lastChild.textContent = " Save failed";
       showToast(`Could not save this draft: ${error.message}`, true);
+      return false;
     }
   }
 
@@ -205,6 +184,188 @@
       card.querySelector(".card-content").addEventListener("dblclick", () => openProject(project.id));
       list.append(card);
     });
+    updateAccountControls();
+  }
+
+  function updateAccountControls() {
+    const configured = Boolean(supabaseClient);
+    const setupWarning = $("#account-setup-warning");
+    const signInButton = $("#sign-in-button");
+    const signOutButton = $("#sign-out-button");
+    const accountEmail = $("#account-email");
+    const accountPanel = $("#account-panel");
+    const setupError = window.portalStudioSetupError || "";
+    setupWarning.hidden = !setupError;
+    if (setupError) setupWarning.textContent = setupError;
+    signInButton.hidden = !configured || Boolean(currentUser);
+    signOutButton.hidden = !configured || !currentUser;
+    accountEmail.hidden = !currentUser;
+    accountEmail.textContent = currentUser?.email || "";
+    accountPanel.hidden = !configured || Boolean(setupError);
+    const savedSlotAvailable = Boolean(quota && projects.length < quota.saved_limit);
+    $("#create-button").disabled = !configured || Boolean(setupError) || !currentUser || !savedSlotAvailable;
+    $("#empty-create-button").disabled = !configured || Boolean(setupError) || !currentUser || !savedSlotAvailable;
+    $("#dashboard-button").hidden = !currentUser;
+    $("#quota-summary").textContent = quota
+      ? `Saved portals: ${projects.length} / ${quota.saved_limit} · Exports used: ${quota.exports_used} / ${quota.export_limit}`
+      : "Sign in to save and export portals.";
+    $("#quota-request-status").textContent = pendingRequest
+      ? `Your request is ${pendingRequest.status}.`
+      : "Each account starts with one saved portal and one export.";
+    $("#request-access-button").hidden = !currentUser || !quota || Boolean(pendingRequest);
+    $("#admin-requests").hidden = !isAdmin;
+  }
+
+  async function loadAccountData() {
+    if (!currentUser || !supabaseClient) return;
+    try {
+      const [draftsResult, quotaResult, adminResult, requestResult] = await Promise.all([
+        supabaseClient.from("portal_drafts").select("id,user_id,name,payload,updated_at").order("updated_at", { ascending: false }),
+        supabaseClient.rpc("get_my_portal_quota"),
+        supabaseClient.rpc("is_portal_admin"),
+        supabaseClient.from("portal_access_requests").select("id,status,created_at").eq("user_id", currentUser.id).eq("status", "pending").maybeSingle()
+      ]);
+      if (draftsResult.error) throw draftsResult.error;
+      if (quotaResult.error) throw quotaResult.error;
+      if (adminResult.error) throw adminResult.error;
+      if (requestResult.error) throw requestResult.error;
+      quota = quotaResult.data?.[0] || null;
+      isAdmin = adminResult.data === true;
+      pendingRequest = requestResult.data;
+      remoteDraftIds.clear();
+      const loaded = [];
+      for (const row of draftsResult.data || []) {
+        remoteDraftIds.add(row.id);
+        const project = normalizeProject(row.payload);
+        project.id = row.id;
+        project.name = row.name;
+        project.updatedAt = row.updated_at;
+        loaded.push(await hydrateCloudImages(project));
+      }
+      projects = loaded;
+      window.portalStudioSetupError = "";
+      updateAccountControls();
+      renderDashboard();
+      if (isAdmin) await renderAdminRequests();
+    } catch (error) {
+      quota = null;
+      window.portalStudioSetupError = `Account storage is not ready: ${error.message}. Run supabase/schema.sql in the Supabase SQL Editor and complete the setup steps in README.`;
+      projects = [];
+      renderDashboard();
+    }
+  }
+
+  async function hydrateCloudImages(project) {
+    for (const image of project.images) {
+      if (!image?.src?.startsWith("storage://")) continue;
+      const path = image.src.slice("storage://".length);
+      const { data, error } = await supabaseClient.storage.from("portal-images").download(path);
+      if (error) throw error;
+      image.src = await blobToDataUrl(data);
+    }
+    return project;
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error("Could not read a saved gallery image."));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function persistCloudProject(project) {
+    if (!currentUser || !quota) throw new Error("Sign in and load your account quota before saving.");
+    const payload = JSON.parse(JSON.stringify(project));
+    const folder = `${currentUser.id}/${safeFilename(project.id)}`;
+    for (let index = 0; index < payload.images.length; index += 1) {
+      const image = payload.images[index];
+      if (!image?.src.startsWith("data:")) continue;
+      const path = `${folder}/slide-${index + 1}`;
+      const blob = await (await fetch(image.src)).blob();
+      const { error: uploadError } = await supabaseClient.storage.from("portal-images").upload(path, blob, {
+        upsert: true,
+        contentType: blob.type
+      });
+      if (uploadError) throw uploadError;
+      image.src = `storage://${path}`;
+    }
+    const retainedPaths = new Set(payload.images
+      .filter(image => image?.src.startsWith("storage://"))
+      .map(image => image.src.slice("storage://".length)));
+    const { data: storedImages, error: listError } = await supabaseClient.storage.from("portal-images").list(folder);
+    if (listError) throw listError;
+    const obsoleteImages = storedImages
+      .map(image => `${folder}/${image.name}`)
+      .filter(path => !retainedPaths.has(path));
+    if (obsoleteImages.length) {
+      const { error: removeError } = await supabaseClient.storage.from("portal-images").remove(obsoleteImages);
+      if (removeError) throw removeError;
+    }
+    const record = {
+      id: project.id,
+      user_id: currentUser.id,
+      name: project.name || "Untitled Wi-Fi Portal",
+      payload,
+      updated_at: new Date().toISOString()
+    };
+    const result = remoteDraftIds.has(project.id)
+      ? await supabaseClient.from("portal_drafts").update(record).eq("id", project.id).eq("user_id", currentUser.id).select("id").single()
+      : await supabaseClient.from("portal_drafts").insert(record).select("id").single();
+    if (result.error) throw result.error;
+    remoteDraftIds.add(project.id);
+    project.updatedAt = record.updated_at;
+  }
+
+  async function renderAdminRequests() {
+    const list = $("#admin-request-list");
+    list.replaceChildren();
+    const { data, error } = await supabaseClient.from("portal_access_requests")
+      .select("id,email,reason,requested_templates,requested_exports,created_at")
+      .eq("status", "pending").order("created_at", { ascending: true });
+    if (error) {
+      showToast(`Could not load access requests: ${error.message}`, true);
+      return;
+    }
+    $("#admin-request-count").textContent = `${data.length} pending`;
+    data.forEach(request => {
+      const row = document.createElement("article");
+      row.className = "admin-request";
+      const text = document.createElement("div");
+      const email = document.createElement("strong");
+      email.textContent = request.email;
+      const reason = document.createElement("p");
+      reason.textContent = request.reason;
+      text.append(email, reason);
+      const actions = document.createElement("div");
+      actions.className = "admin-request-actions";
+      [["Approve +1", true], ["Deny", false]].forEach(([label, approved]) => {
+        const button = document.createElement("button");
+        button.textContent = label;
+        if (approved) button.className = "approve";
+        button.addEventListener("click", () => reviewAccessRequest(request.id, approved));
+        actions.append(button);
+      });
+      row.append(text, actions);
+      list.append(row);
+    });
+    $("#admin-requests").hidden = !isAdmin;
+  }
+
+  async function reviewAccessRequest(id, approved) {
+    const { error } = await supabaseClient.rpc("review_portal_access_request", {
+      p_request_id: id,
+      p_approve: approved,
+      p_extra_templates: approved ? 1 : 0,
+      p_extra_exports: approved ? 1 : 0
+    });
+    if (error) {
+      showToast(`Could not review request: ${error.message}`, true);
+      return;
+    }
+    showToast(approved ? "Request approved." : "Request denied.");
+    await loadAccountData();
   }
 
   function formatDate(value) {
@@ -232,10 +393,19 @@
   }
 
   async function createProject() {
+    if (!currentUser || !quota) {
+      showToast("Sign in to create and save a portal.", true);
+      return;
+    }
+    if (projects.length >= quota.saved_limit) {
+      showToast("You have reached your saved portal limit. Request additional access from the dashboard.", true);
+      return;
+    }
     currentProject = freshProject();
     try {
-      await storeRequest("readwrite", "put", currentProject);
+      await persistCloudProject(currentProject);
       projects.push(currentProject);
+      quota = { ...quota, saved_limit: quota.saved_limit };
       openEditor();
       showToast("New portal created from the Omada template.");
     } catch (error) {
@@ -245,13 +415,17 @@
   }
 
   async function duplicateProject(project) {
+    if (!quota || projects.length >= quota.saved_limit) {
+      showToast("You have reached your saved portal limit. Request additional access from the dashboard.", true);
+      return;
+    }
     const duplicate = JSON.parse(JSON.stringify(project));
     duplicate.id = makeId();
     duplicate.name = `${project.name || "Wi-Fi Portal"} copy`.slice(0, 70);
     duplicate.createdAt = new Date().toISOString();
     duplicate.updatedAt = duplicate.createdAt;
     try {
-      await storeRequest("readwrite", "put", duplicate);
+      await persistCloudProject(duplicate);
       projects.push(duplicate);
       renderDashboard();
       showToast("Portal duplicated.");
@@ -263,8 +437,20 @@
   async function deleteProject(project) {
     if (!window.confirm(`Delete "${project.name || "Untitled Wi-Fi Portal"}"? This cannot be undone.`)) return;
     try {
-      await storeRequest("readwrite", "delete", project.id);
+      const { error: remoteError } = await supabaseClient.from("portal_drafts")
+        .delete().eq("id", project.id).eq("user_id", currentUser.id);
+      if (remoteError) throw remoteError;
+      remoteDraftIds.delete(project.id);
+      const folder = `${currentUser.id}/${safeFilename(project.id)}`;
+      const { data: objects, error: listError } = await supabaseClient.storage.from("portal-images").list(folder);
+      if (listError) throw listError;
+      if (objects.length) {
+        const { error: removeError } = await supabaseClient.storage.from("portal-images")
+          .remove(objects.map(object => `${folder}/${object.name}`));
+        if (removeError) throw removeError;
+      }
       projects = projects.filter(item => item.id !== project.id);
+      quota = { ...quota, saved_limit: quota.saved_limit };
       renderDashboard();
       showToast("Portal deleted.");
     } catch (error) {
@@ -751,6 +937,10 @@
         bar.classList.add("error");
         status.textContent = `ZIP is ${formatBytes(size)}; it must be under 2 MB. Remove gallery images or replace large images with smaller, optimized files.`;
         button.disabled = true;
+      } else if (quota && quota.exports_used >= quota.export_limit) {
+        bar.classList.add("warning");
+        status.textContent = `ZIP size: ${formatBytes(size)}. Your ${quota.export_limit} export allowance has been used; request additional access from the dashboard.`;
+        button.disabled = true;
       } else {
         status.textContent = `ZIP size: ${formatBytes(size)} of 2 MB limit · ready to export.`;
         button.disabled = false;
@@ -765,10 +955,19 @@
 
   async function exportProject() {
     if (!currentProject || !templateHtml) return;
+    if (!currentUser || !quota) {
+      showToast("Sign in and load your account quota before exporting.", true);
+      return;
+    }
+    if (quota.exports_used >= quota.export_limit) {
+      showToast("You have used your export allowance. Request additional access from the dashboard.", true);
+      return;
+    }
     const button = $("#export-button");
     button.disabled = true;
     button.textContent = "Preparing ZIP…";
     try {
+      if (!await saveCurrentProject(true)) throw new Error("Save the portal before exporting.");
       const files = await buildExportFiles();
       const size = zipSizeBytes(files);
       if (size >= MAX_EXPORT_BYTES) {
@@ -777,13 +976,18 @@
         throw new Error("The portal ZIP exceeds the 2 MB limit.");
       }
       const blob = makeZip(files);
+      const { data: exportsUsed, error: reserveError } = await supabaseClient.rpc("reserve_portal_export", {
+        p_draft_id: currentProject.id
+      });
+      if (reserveError) throw reserveError;
+      quota = { ...quota, exports_used: exportsUsed };
+      updateAccountControls();
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = `${safeFilename(currentProject.name)}-omada-portal.zip`;
       anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      await saveCurrentProject(true);
       showToast("Portal ZIP exported and draft saved.");
     } catch (error) {
       showToast(`Could not export portal: ${error.message}`, true);
@@ -891,20 +1095,84 @@
 
   async function initialize() {
     try {
-      const [templateResponse, loadedProjects] = await Promise.all([
-        fetch("template/index.html"),
-        storeRequest("readonly", "all")
-      ]);
+      const templateResponse = await fetch("template/index.html");
       if (!templateResponse.ok) throw new Error("The Omada template files could not be loaded.");
       templateHtml = await templateResponse.text();
-      projects = (loadedProjects || []).map(normalizeProject);
-      renderDashboard();
+      if (!supabaseClient) {
+        window.portalStudioSetupError = "Secure account saving is unavailable: Supabase client configuration could not be loaded.";
+        renderDashboard();
+        return;
+      }
+      supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (event === "SIGNED_IN") {
+          window.setTimeout(async () => {
+            currentUser = session?.user || null;
+            $("#auth-dialog").close();
+            await loadAccountData();
+          }, 0);
+        } else if (event === "SIGNED_OUT") {
+          currentUser = null;
+          projects = [];
+          currentProject = null;
+          quota = null;
+          isAdmin = false;
+          pendingRequest = null;
+          remoteDraftIds.clear();
+          editorView.hidden = true;
+          dashboardView.hidden = false;
+          $("#top-save-button").hidden = true;
+          renderDashboard();
+        }
+      });
+      const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
+      if (sessionError) throw sessionError;
+      currentUser = sessionData.session?.user || null;
+      if (currentUser) await loadAccountData();
+      else renderDashboard();
       $("#loading-indicator")?.remove();
     } catch (error) {
-      showToast(`Portal Studio could not start: ${error.message}. Open it through a local web server.`, true);
-      $("#create-button").disabled = true;
+      window.portalStudioSetupError = `Portal Studio could not start securely: ${error.message}.`;
+      renderDashboard();
+      showToast(window.portalStudioSetupError, true);
     }
   }
+
+  $("#sign-in-button").addEventListener("click", () => $("#auth-dialog").showModal());
+  $("#sign-out-button").addEventListener("click", async () => {
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) showToast(`Could not sign out: ${error.message}`, true);
+  });
+  $("#auth-close").addEventListener("click", () => $("#auth-dialog").close());
+  $("#auth-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = $("#auth-submit");
+    const message = $("#auth-message");
+    button.disabled = true;
+    message.textContent = "Sending your secure sign-in link…";
+    try {
+      const { error } = await supabaseClient.auth.signInWithOtp({
+        email: $("#auth-email").value.trim(),
+        options: { emailRedirectTo: window.location.origin + window.location.pathname }
+      });
+      if (error) throw error;
+      message.textContent = "Check your email for the sign-in link, then return to this page.";
+    } catch (error) {
+      message.textContent = `Could not send sign-in link: ${error.message}`;
+    } finally {
+      button.disabled = false;
+    }
+  });
+  $("#request-access-button").addEventListener("click", async () => {
+    const reason = window.prompt("Why do you need additional saved portal and export access?");
+    if (!reason) return;
+    const { error } = await supabaseClient.rpc("request_extra_portal_access", { p_reason: reason });
+    if (error) {
+      showToast(`Could not submit request: ${error.message}`, true);
+      return;
+    }
+    showToast("Your request has been sent to the administrator.");
+    await loadAccountData();
+  });
 
   $("#create-button").addEventListener("click", createProject);
   $("#empty-create-button").addEventListener("click", createProject);

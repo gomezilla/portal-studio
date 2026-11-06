@@ -16,6 +16,9 @@
     </a>
     <div class="topbar-right">
       <span class="save-indicator" id="save-indicator"><i></i> All changes saved</span>
+      <span class="account-email" id="account-email" hidden></span>
+      <button class="button button-quiet" id="sign-in-button" type="button">Sign in</button>
+      <button class="button button-quiet" id="sign-out-button" type="button" hidden>Sign out</button>
       <button class="button button-quiet" id="dashboard-button" type="button">My portals</button>
       <button class="button button-primary" id="top-save-button" type="button" hidden>Save draft</button>
     </div>
@@ -39,18 +42,29 @@
         </div>
         <span class="template-tag">OMADA READY</span>
       </div>
+      <div class="account-panel" id="account-panel" hidden>
+        <div><strong id="quota-summary">Sign in to save and export portals.</strong><p id="quota-request-status"></p></div>
+        <button class="button button-quiet" id="request-access-button" type="button" hidden>Request more access</button>
+      </div>
+      <div class="account-setup-warning" id="account-setup-warning" hidden>
+        Account quotas are not configured. Saving and exporting are disabled until the administrator completes the Supabase setup described in README.
+      </div>
+      <section class="admin-requests" id="admin-requests" hidden>
+        <div class="subsection-heading"><h2>Access requests</h2><span id="admin-request-count"></span></div>
+        <div id="admin-request-list"></div>
+      </section>
       <div class="library-heading">
         <div><h2>Saved portals</h2><span id="portal-count" class="count-label">0 drafts</span></div>
-        <span class="muted small">Saved privately in this browser</span>
+        <span class="muted small">Saved privately to your account</span>
       </div>
       <div class="portal-list" id="portal-list"></div>
       <div class="empty-state" id="empty-state" hidden>
         <div class="empty-illustration" aria-hidden="true"><span>✦</span></div>
         <h3>Your next great welcome page starts here.</h3>
-        <p>Create a portal to customize the copy, images, and colors. Your drafts stay on this device.</p>
+        <p>Create a portal to customize the copy, images, and colors. Your drafts sync privately to your account.</p>
         <button class="button button-primary" id="empty-create-button" type="button">Create your first portal</button>
       </div>
-      <p class="privacy-note"><span aria-hidden="true">◈</span> Drafts and uploaded images are stored locally in this browser. Nothing is sent to a server.</p>
+      <p class="privacy-note"><span aria-hidden="true">◈</span> Drafts and gallery uploads are private to your account. Nothing is public.</p>
     </section>
 
     <section class="editor page-view" id="editor-view" hidden>
@@ -194,6 +208,19 @@
     </section>
   </main>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog class="auth-dialog" id="auth-dialog" aria-labelledby="auth-title">
+    <form id="auth-form">
+      <button class="dialog-close" id="auth-close" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">PORTAL STUDIO ACCOUNT</p>
+      <h2 id="auth-title">Sign in to save your work</h2>
+      <p class="muted">We’ll email you a secure sign-in link. Your saved portals and export allowance follow your account.</p>
+      <label class="field" for="auth-email">Email address<input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+      <button class="button button-primary" type="submit" id="auth-submit">Email me a sign-in link</button>
+      <p class="auth-message" id="auth-message" aria-live="polite"></p>
+    </form>
+  </dialog>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

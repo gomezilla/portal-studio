@@ -1,6 +1,6 @@
 # Portal Studio
 
-A browser-based editor for the supplied Omada captive-portal template. Portal drafts are stored in the browser's IndexedDB; they are not uploaded to a service.
+A browser-based editor for the supplied Omada captive-portal template. Authenticated portal drafts are stored in Supabase with row-level security; gallery uploads use a private Supabase Storage bucket.
 
 ## Gallery and visual presets
 
@@ -40,8 +40,17 @@ Live site: [https://gomezilla.github.io/portal-studio/](https://gomezilla.github
 
 Source: [github.com/gomezilla/portal-studio](https://github.com/gomezilla/portal-studio)
 
-Drafts remain in each visitor's browser and are not shared across devices.
+Supabase must be configured by running the schema and enabling email authentication before visitors can save or export. Until setup is complete, the app fails closed instead of falling back to insecure local quotas.
 
 ## Account quotas and approval workflow
 
-The current site stores drafts in each visitor's browser. A secure one-template-per-account quota and administrator approval for additional templates require a configured Supabase project and authenticated accounts; a browser-only limit would be bypassable. This workflow is not enabled until the project is provisioned and its public URL/key are configured. Never put a Supabase service-role key in the website.
+The app uses Supabase email magic-link authentication, private image storage, database-enforced one-saved-portal and one-export starting limits, and administrator review of requests for one additional portal/export. The browser publishable key is in `supabase-config.js`; it is designed for public use and is protected by Supabase row-level security. Never put a Supabase service-role key in the website.
+
+To activate account saving and approvals for a Supabase project:
+
+1. In Supabase **SQL Editor**, run [`supabase/schema.sql`](./supabase/schema.sql).
+2. In that SQL file's final statement, replace `REPLACE_WITH_ADMIN_EMAIL` with the administrator's verified email and run the statement. This keeps the admin address out of the public app configuration.
+3. In **Authentication → URL Configuration**, set the site URL to `https://gomezilla.github.io/portal-studio/` and add it to the redirect URLs.
+4. Enable email sign-in/magic links. Users need a verified account to save or export. If the schema or auth setup is incomplete, account saving/export remain unavailable rather than falling back to an insecure client-side quota.
+
+Each approved request grants that account one additional saved portal and one additional export. The administrator reviews pending requests in the dashboard. The 2 MB ZIP limit is separate from the per-account export allowance.
