@@ -76,6 +76,7 @@
   let templateHtml = "";
   let currentProject = null;
   let currentUser = null;
+  let pendingCreateAfterSignIn = false;
   let quota = null;
   let isAdmin = false;
   let pendingRequest = null;
@@ -287,9 +288,9 @@
     accountEmail.hidden = !currentUser;
     accountEmail.textContent = currentUser?.email || "";
     accountPanel.hidden = !configured || Boolean(setupError);
-    const savedSlotAvailable = Boolean(quota && projects.length < quota.saved_limit);
-    $("#create-button").disabled = !configured || Boolean(setupError) || !currentUser || !savedSlotAvailable;
-    $("#empty-create-button").disabled = !configured || Boolean(setupError) || !currentUser || !savedSlotAvailable;
+    const savedSlotUnavailable = Boolean(currentUser && (!quota || projects.length >= quota.saved_limit));
+    $("#create-button").disabled = !configured || Boolean(setupError) || savedSlotUnavailable;
+    $("#empty-create-button").disabled = !configured || Boolean(setupError) || savedSlotUnavailable;
     $("#dashboard-button").hidden = !currentUser;
     $("#quota-summary").textContent = quota
       ? `Saved portals: ${projects.length} / ${quota.saved_limit} · Exports used: ${quota.exports_used} / ${quota.export_limit}`
@@ -488,8 +489,14 @@
   }
 
   async function createProject() {
-    if (!currentUser || !quota) {
-      showToast("Sign in to create and save a portal.", true);
+    if (!currentUser) {
+      pendingCreateAfterSignIn = true;
+      $("#auth-message").textContent = "Sign in to continue creating your portal.";
+      $("#auth-dialog").showModal();
+      return;
+    }
+    if (!quota) {
+      showToast("Your account quota is still loading. Please try again.", true);
       return;
     }
     if (projects.length >= quota.saved_limit) {
@@ -502,7 +509,6 @@
       projects.push(currentProject);
       quota = { ...quota, saved_limit: quota.saved_limit };
       openEditor();
-      showThankYou("created");
     } catch (error) {
       currentProject = null;
       showToast(`Could not create a draft: ${error.message}`, true);
@@ -981,10 +987,13 @@
 
   function showThankYou(action) {
     const dialog = $("#thank-you-dialog");
-    $("#thank-you-title").textContent = action === "exported" ? "Export complete" : "Your portal is ready";
-    $("#thank-you-description").textContent = action === "exported"
-      ? "Your Omada ZIP is downloading, and your draft is saved. You can continue editing or return to your portals."
-      : "Your new portal draft is saved. Keep customizing it, or export it when it’s ready.";
+    const isSupport = action === "support";
+    $("#thank-you-title").textContent = isSupport ? "Support Portal Studio" : "Export complete";
+    $("#thank-you-description").textContent = isSupport
+      ? "If Portal Studio has been useful, you can optionally contribute to support its continued development."
+      : "Your Omada ZIP is downloading, and your draft is saved. You can continue editing or return to your portals.";
+    $("#thank-you-continue").textContent = isSupport ? "Close" : "Continue editing";
+    $("#thank-you-dashboard").hidden = isSupport;
     dialog.showModal();
   }
 
@@ -1239,6 +1248,10 @@
             currentUser = session?.user || null;
             $("#auth-dialog").close();
             await loadAccountData();
+            if (pendingCreateAfterSignIn) {
+              pendingCreateAfterSignIn = false;
+              await createProject();
+            }
           }, 0);
         } else if (event === "SIGNED_OUT") {
           currentUser = null;
@@ -1268,6 +1281,7 @@
   }
 
   $("#sign-in-button").addEventListener("click", () => $("#auth-dialog").showModal());
+  $("#support-button").addEventListener("click", () => showThankYou("support"));
   $("#sign-out-button").addEventListener("click", async () => {
     const { error } = await supabaseClient.auth.signOut();
     if (error) showToast(`Could not sign out: ${error.message}`, true);
@@ -1278,6 +1292,7 @@
     const button = $("#auth-submit");
     const message = $("#auth-message");
     button.disabled = true;
+    message.classList.remove("warning");
     message.textContent = "Sending your secure sign-in link…";
     try {
       const { error } = await supabaseClient.auth.signInWithOtp({
@@ -1287,7 +1302,12 @@
       if (error) throw error;
       message.textContent = "Check your email for the sign-in link, then return to this page.";
     } catch (error) {
-      message.textContent = `Could not send sign-in link: ${error.message}`;
+      const errorText = error.message || String(error);
+      const rateLimited = /rate.?limit|too many requests/i.test(errorText);
+      message.classList.toggle("warning", rateLimited);
+      message.textContent = rateLimited
+        ? "Supabase’s email rate limit has been reached. Wait before trying again. For reliable delivery, configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings."
+        : `Could not send sign-in link: ${errorText}`;
     } finally {
       button.disabled = false;
     }

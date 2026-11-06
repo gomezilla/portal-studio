@@ -32,7 +32,9 @@ Each of the three connection-guide steps has its own sample image control. Repla
 
 The live preview opens in mobile size by default; switch to desktop to inspect the wider layout. Color mode can follow the visitor's device or be fixed to light or dark. The preview-only theme control lets you inspect both modes without changing the saved setting.
 
-After creating a draft or completing an export, Portal Studio shows a dismissible success panel with an optional InstaPay QR contribution. It does not show sponsorship tiers or block editing. The exported portal and Portal Studio include a non-editable “Made by Gomezilla Portal Studio” attribution.
+After exporting, Portal Studio shows a dismissible success panel with an optional InstaPay QR contribution. A **Support** button in the header opens the same contribution page anytime. Creating a draft does not interrupt the editor with a donation prompt. The exported portal and Portal Studio include a non-editable “Made by Gomezilla Portal Studio” attribution.
+
+If Supabase's built-in email service reaches its rate limit, wait before requesting another sign-in link. For reliable delivery, configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings.
 
 ## Template source
 
