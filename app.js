@@ -81,6 +81,7 @@
   let toastTimer = 0;
   let sizeCheckTimer = 0;
   let previewDark = false;
+  let previewDevice = "mobile";
   const templateAssets = new Map();
   let sizeCheckSequence = 0;
 
@@ -407,7 +408,7 @@
       projects.push(currentProject);
       quota = { ...quota, saved_limit: quota.saved_limit };
       openEditor();
-      showToast("New portal created from the Omada template.");
+      showThankYou("created");
     } catch (error) {
       currentProject = null;
       showToast(`Could not create a draft: ${error.message}`, true);
@@ -862,6 +863,27 @@
     button.innerHTML = previewDark ? '<span aria-hidden="true">☾</span> Preview light mode' : '<span aria-hidden="true">☼</span> Preview dark mode';
   }
 
+  function setPreviewDevice(device) {
+    previewDevice = device;
+    const frame = $(".browser-frame");
+    frame.classList.toggle("mobile", previewDevice === "mobile");
+    frame.classList.toggle("desktop", previewDevice === "desktop");
+    $$("[data-preview-device]").forEach(button => {
+      const selected = button.dataset.previewDevice === previewDevice;
+      button.classList.toggle("active", selected);
+      button.setAttribute("aria-pressed", String(selected));
+    });
+  }
+
+  function showThankYou(action) {
+    const dialog = $("#thank-you-dialog");
+    $("#thank-you-title").textContent = action === "exported" ? "Export complete" : "Your portal is ready";
+    $("#thank-you-description").textContent = action === "exported"
+      ? "Your Omada ZIP is downloading, and your draft is saved. You can continue editing or return to your portals."
+      : "Your new portal draft is saved. Keep customizing it, or export it when it’s ready.";
+    dialog.showModal();
+  }
+
   function queueExportSizeCheck() {
     window.clearTimeout(sizeCheckTimer);
     sizeCheckTimer = window.setTimeout(updateExportSizeStatus, 180);
@@ -988,7 +1010,7 @@
       anchor.download = `${safeFilename(currentProject.name)}-omada-portal.zip`;
       anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      showToast("Portal ZIP exported and draft saved.");
+      showThankYou("exported");
     } catch (error) {
       showToast(`Could not export portal: ${error.message}`, true);
     } finally {
@@ -1231,6 +1253,18 @@
     previewDark = !previewDark;
     setPreviewThemeButton();
     updatePreview();
+  });
+  $$("[data-preview-device]").forEach(button => {
+    button.addEventListener("click", () => setPreviewDevice(button.dataset.previewDevice));
+  });
+  $("#thank-you-close").addEventListener("click", () => $("#thank-you-dialog").close());
+  $("#thank-you-continue").addEventListener("click", () => $("#thank-you-dialog").close());
+  $("#thank-you-dashboard").addEventListener("click", () => {
+    $("#thank-you-dialog").close();
+    showDashboard();
+  });
+  $("#thank-you-dialog").addEventListener("click", event => {
+    if (event.target === event.currentTarget) event.currentTarget.close();
   });
   $("#copy-preauth-domains").addEventListener("click", async () => {
     try {

@@ -324,6 +324,9 @@ for delete to authenticated using (
 );
 
 -- Sign in once with this verified email before running this schema.
+delete from public.portal_admins
+where lower(email) = 'chrsistianzemog@gmail.com';
+
 insert into public.portal_admins(email)
-values ('chrsistianzemog@gmail.com')
+values ('christianzemog@gmail.com')
 on conflict (email) do nothing;

@@ -28,7 +28,9 @@ Open [http://localhost:4173](http://localhost:4173). The editor fetches the bund
 
 Create a portal from the dashboard, then edit its content, plan rows, display options, theme preset, brand color, corner style, and gallery images. The editor autosaves drafts locally and supports multiple portals. Choose **Export ZIP** to download an Omada-ready archive containing the customized `index.html`, the original authentication and speed-test scripts, stylesheets, and required template images. Replaced gallery images are included in the archive.
 
-Color mode can follow the visitor's device or be fixed to light or dark. The preview-only theme control lets you inspect both modes without changing the saved setting.
+The live preview opens in mobile size by default; switch to desktop to inspect the wider layout. Color mode can follow the visitor's device or be fixed to light or dark. The preview-only theme control lets you inspect both modes without changing the saved setting.
+
+After creating a draft or completing an export, Portal Studio shows a dismissible success panel with an optional InstaPay QR contribution. It does not show sponsorship tiers or block editing. The exported portal and Portal Studio include a non-editable “Made by Gomezilla Portal Studio” attribution.
 
 ## Template source
 
@@ -48,7 +50,7 @@ The app uses Supabase email magic-link authentication, private image storage, da
 
 To activate account saving and approvals for a Supabase project:
 
-1. Enable email sign-in/magic links and sign in once with the verified administrator account `chrsistianzemog@gmail.com`.
+1. Enable email sign-in/magic links and sign in once with the verified administrator account `christianzemog@gmail.com`.
 2. In Supabase **SQL Editor**, run [`supabase/schema.sql`](./supabase/schema.sql). Its final statement registers the verified administrator email; it is safe to run again.
 3. In **Authentication → URL Configuration**, set the site URL to `https://gomezilla.github.io/portal-studio/` and add it to the redirect URLs.
 4. Users need verified accounts to save or export. If the schema or auth setup is incomplete, account saving/export remain unavailable rather than falling back to an insecure client-side quota.

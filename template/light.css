@@ -297,6 +297,7 @@ td:first-child { font-weight: 700; }
 .notes { margin: 16px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; text-align: center; }
 #oper-hint { display: block; margin: 0 0 10px; font-size: 13px; font-weight: 600; }
 .footer-note { margin-top: 15px; color: var(--muted); font-size: 10px; text-align: center; }
+.studio-attribution { margin-top: 7px; color: var(--muted); font-size: 9px; text-align: center; }
 
 @media (max-width: 760px) {
     body { padding: 16px 12px; align-items: flex-start; }

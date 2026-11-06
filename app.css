@@ -105,3 +105,41 @@ h1, h2, h3, p { margin-top: 0; }
   .dashboard { width: calc(100% - 32px); padding-top: 36px; }.dashboard-heading { align-items: flex-start; flex-direction: column; margin-bottom: 23px; }.dashboard-heading .button { align-self: stretch; justify-content: center; }.template-tag { display: none; }.template-banner { align-items: flex-start; padding: 14px; }.library-heading { align-items: flex-start; flex-direction: column; gap: 7px; margin-top: 28px; }
   .editor { height: auto; min-height: calc(100vh - 58px); }.editor-heading { height: auto; min-height: 58px; flex-wrap: wrap; gap: 5px 12px; padding: 7px 12px; }.export-size-bar { padding: 7px 12px; line-height: 1.4; }.editor-title-wrap { order: 2; flex: 1 1 43%; }.project-name { width: 100%; font-size: 12px; }.back-button { order: 1; }.editor-actions { order: 3; gap: 6px; }.editor-actions .button { padding: 7px 9px; font-size: 10px; }.editor-body { display: flex; flex-direction: column; }.settings-panel { min-height: 540px; border-right: 0; border-bottom: 1px solid #e9e8ef; }.settings-scroll { min-height: 450px; max-height: 70vh; }.preview-area { min-height: 600px; }.preview-toolbar { padding: 0 15px; }.preview-canvas { padding: 12px; }.browser-frame { min-height: 510px; }.panel-footer { padding: 0 20px; }
 }
+.app-footer { min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 16px; border-top: 1px solid #e9e8ef; color: #858495; background: #fff; font-size: 10px; }
+.app-footer strong { color: #5f4b91; font-weight: 700; }
+body { display: flex; flex-direction: column; }
+main { flex: 1; }
+.editor { height: calc(100vh - 106px); }
+.preview-toolbar-actions { display: flex; align-items: center; gap: 9px; }
+.preview-device-switch { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid #eae9ef; border-radius: 8px; background: #f7f6f9; }
+.preview-device-button { padding: 5px 8px; border: 0; border-radius: 5px; color: #777687; background: transparent; font-size: 10px; }
+.preview-device-button.active { color: #554778; background: #fff; box-shadow: 0 1px 3px #211f3218; }
+.browser-frame.desktop { width: min(100%, 1020px); }
+.browser-frame.mobile { width: min(390px, 100%); height: min(740px, 100%); min-height: 500px; }
+.thank-you-dialog { position: relative; width: min(650px, calc(100% - 32px)); max-width: 650px; padding: 31px; border: 1px solid #e8e7ed; border-radius: 18px; color: var(--ink); background: #fff; box-shadow: 0 24px 80px #24203335; }
+.thank-you-dialog::backdrop { background: #201d2c70; backdrop-filter: blur(3px); }
+.thank-you-layout { display: grid; grid-template-columns: minmax(0, 1fr) 205px; align-items: center; gap: 26px; }
+.thank-you-copy h2 { margin: 0 0 9px; font: 750 25px/1.2 Manrope, sans-serif; letter-spacing: -.7px; }
+.thank-you-copy > .eyebrow { margin-bottom: 10px; }
+.thank-you-description { margin: 0; color: #777687; font-size: 12px; line-height: 1.65; }
+.donation-note { margin-top: 23px; padding: 13px 14px; border: 1px solid #ece8f4; border-radius: 10px; background: #faf9fc; }
+.donation-note strong { color: #4d4d60; font-size: 11px; }
+.donation-note p { margin: 5px 0 0; color: #858496; font-size: 10px; line-height: 1.55; }
+.donation-card { display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 11px; border: 1px solid #ecebf0; border-radius: 12px; background: #fff; }
+.donation-card img { display: block; width: 100%; height: auto; border-radius: 6px; }
+.donation-card span { color: #777687; font-size: 9px; text-align: center; }
+.thank-you-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 25px; padding-top: 17px; border-top: 1px solid #f0eff3; }
+@media(max-width: 900px) { .editor { height: auto; min-height: calc(100vh - 106px); } }
+@media(max-width: 680px) {
+  .editor { height: auto; min-height: calc(100vh - 96px); }
+  .preview-toolbar { gap: 8px; padding: 0 10px; }
+  .preview-toolbar-actions { gap: 5px; }
+  .preview-device-button { padding: 5px 6px; font-size: 9px; }
+  .theme-preview-button { padding: 6px; font-size: 9px; white-space: nowrap; }
+  .browser-frame.mobile { height: 590px; min-height: 510px; }
+  .thank-you-dialog { padding: 24px 19px 18px; }
+  .thank-you-layout { grid-template-columns: 1fr; gap: 16px; }
+  .thank-you-copy h2 { font-size: 22px; }
+  .donation-card { width: min(190px, 100%); justify-self: center; }
+  .thank-you-actions { flex-direction: column; }
+}

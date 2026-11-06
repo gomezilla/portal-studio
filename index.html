@@ -193,11 +193,17 @@
 
         <section class="preview-area" aria-label="Live portal preview">
           <div class="preview-toolbar">
-            <div class="preview-heading"><span class="live-indicator"></span><strong>Live preview</strong><span class="preview-device">Desktop</span></div>
-            <button class="theme-preview-button" id="theme-preview-button" type="button"><span aria-hidden="true">☼</span> Preview dark mode</button>
+            <div class="preview-heading"><span class="live-indicator"></span><strong>Live preview</strong></div>
+            <div class="preview-toolbar-actions">
+              <div class="preview-device-switch" role="group" aria-label="Preview device size">
+                <button class="preview-device-button active" type="button" data-preview-device="mobile" aria-pressed="true">Mobile</button>
+                <button class="preview-device-button" type="button" data-preview-device="desktop" aria-pressed="false">Desktop</button>
+              </div>
+              <button class="theme-preview-button" id="theme-preview-button" type="button"><span aria-hidden="true">☼</span> Preview dark mode</button>
+            </div>
           </div>
           <div class="preview-canvas">
-            <div class="browser-frame">
+            <div class="browser-frame mobile">
               <div class="browser-top"><span class="traffic-lights"><i></i><i></i><i></i></span><span class="address-bar">welcome.portal</span><span class="frame-menu">•••</span></div>
               <iframe id="portal-preview" title="Live preview of your Omada Wi-Fi portal"></iframe>
             </div>
@@ -207,7 +213,30 @@
       </div>
     </section>
   </main>
+  <footer class="app-footer">Made by <strong>Gomezilla Portal Studio</strong></footer>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog class="thank-you-dialog" id="thank-you-dialog" aria-labelledby="thank-you-title">
+    <button class="dialog-close" id="thank-you-close" type="button" aria-label="Close">×</button>
+    <div class="thank-you-layout">
+      <div class="thank-you-copy">
+        <p class="eyebrow">PORTAL STUDIO</p>
+        <h2 id="thank-you-title">Your portal is ready</h2>
+        <p class="thank-you-description" id="thank-you-description"></p>
+        <div class="donation-note">
+          <strong>Enjoying Portal Studio?</strong>
+          <p>Contributions are completely optional and help support ongoing improvements.</p>
+        </div>
+      </div>
+      <div class="donation-card">
+        <img src="assets/instapay-donation.png" alt="InstaPay QR code for an optional contribution" width="768" height="772">
+        <span>Scan with your banking or e-wallet app</span>
+      </div>
+    </div>
+    <div class="thank-you-actions">
+      <button class="button button-primary" id="thank-you-continue" type="button">Continue editing</button>
+      <button class="button button-quiet" id="thank-you-dashboard" type="button">Back to my portals</button>
+    </div>
+  </dialog>
   <dialog class="auth-dialog" id="auth-dialog" aria-labelledby="auth-title">
     <form id="auth-form">
       <button class="dialog-close" id="auth-close" type="button" aria-label="Close">×</button>
