@@ -26,7 +26,7 @@ Open [http://localhost:4173](http://localhost:4173). The editor fetches the bund
 
 ## Customize and export
 
-Create a portal from the dashboard, then edit its content, plan rows, display options, theme preset, brand color, corner style, and gallery images. The editor autosaves drafts locally and supports multiple portals. Choose **Export ZIP** to download an Omada-ready archive containing the customized `index.html`, the original authentication and speed-test scripts, stylesheets, and required template images. Replaced gallery images are included in the archive.
+Create a portal from the dashboard, then edit its content, plan rows, display options, theme preset, brand color, corner style, and gallery images. The appearance icon in the top bar cycles the editor through device, light, and dark modes. The editor autosaves drafts locally and supports multiple portals. Choose **Export ZIP** to download an Omada-ready archive containing the customized `index.html`, the original authentication and speed-test scripts, stylesheets, and required template images. Replaced gallery images are included in the archive.
 
 Each of the three connection-guide steps has its own sample image control. Replace a sample with a JPG, PNG, GIF, or WebP up to 5 MB, or remove it to omit that image from the preview and exported ZIP.
 
@@ -54,7 +54,7 @@ The app uses Supabase email/password authentication, private image storage, data
 
 To activate account saving and approvals for a Supabase project:
 
-1. Enable email/password sign-in and sign in with the administrator account `christianzemog@gmail.com`.
+1. Enable email/password sign-in. In Supabase Authentication → Users, confirm an account exists for `christianzemog@gmail.com`. The SQL schema adds an administrator allowlist entry; it does not create an Auth account or set its password. If this account previously used magic links, use **Forgot password?** on the sign-in form. If it does not exist, create it through the app and verify its email before signing in.
 2. In Supabase **SQL Editor**, run [`supabase/schema.sql`](./supabase/schema.sql). Its final statement registers the verified administrator email; it is safe to run again.
 3. In **Authentication → URL Configuration**, set the site URL to `https://gomezilla.github.io/portal-studio/` and add it to the redirect URLs.
 4. Configure email confirmation as desired. If the schema or auth setup is incomplete, account saving/export remain unavailable rather than falling back to an insecure client-side quota.
@@ -64,3 +64,5 @@ Each approved request grants that account one additional saved portal and one ad
 ## Offline copy
 
 A separate no-authentication version is available in `/Users/system32/Documents/omada-portal-studio-offline`. Run `python3 -m http.server 4173` from that folder and open `http://localhost:4173`. It saves drafts and gallery images in browser IndexedDB with no account or template/export-count limits. The strict under-2-MB ZIP limit still applies. In a supported browser, choose the `saved-template/` folder from the editor to write ZIP exports there; otherwise exports use the browser's regular download flow. Browser drafts are local to that browser and can be lost if its site data is cleared, so keep ZIP backups.
+
+For macOS, use the [Portal Studio Offline DMG installer](../omada-portal-studio-offline/dist/Portal-Studio-Offline-macOS.dmg). It is built for Apple Silicon and is locally signed but not Apple-notarized, so macOS may require Control-click → **Open** the first time.

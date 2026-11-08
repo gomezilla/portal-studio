@@ -212,6 +212,16 @@
   }
 
   async function saveOfflineExport(blob, filename) {
+    if (window.PORTAL_STUDIO_DESKTOP && window.webkit?.messageHandlers?.portalStudioSave) {
+      const requestId = makeId();
+      const data = await blobToBase64(blob);
+      const result = new Promise(resolve => {
+        window.portalStudioSaveCallbacks ||= {};
+        window.portalStudioSaveCallbacks[requestId] = resolve;
+      });
+      window.webkit.messageHandlers.portalStudioSave.postMessage({ requestId, filename, data });
+      return result;
+    }
     const directory = await getLocalSetting("export-directory");
     if (directory && await directory.queryPermission({ mode: "readwrite" }) === "granted") {
       const file = await directory.getFileHandle(filename, { create: true });
@@ -220,6 +230,23 @@
       await writable.close();
       return true;
     }
+
+    function blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",", 2)[1]);
+        reader.onerror = () => reject(reader.error || new Error("Could not prepare the ZIP for saving."));
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    window.portalStudioSaveComplete = (requestId, saved) => {
+      const callbacks = window.portalStudioSaveCallbacks;
+      const resolve = callbacks?.[requestId];
+      if (!resolve) return;
+      delete callbacks[requestId];
+      resolve(saved);
+    };
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -914,8 +941,18 @@
     document.documentElement.dataset.colorScheme = selected === "system"
       ? window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
       : selected;
-    $("#app-theme-select").value = selected;
+    const icon = selected === "dark" ? "☾" : selected === "light" ? "☼" : "◐";
+    const label = `Appearance: ${selected === "system" ? "Follow device" : selected}`;
+    $("#app-theme-icon").textContent = icon;
+    $("#app-theme-toggle").setAttribute("aria-label", label);
+    $("#app-theme-toggle").title = `${label} · Click to change`;
     localStorage.setItem("portal-studio-app-theme", selected);
+  }
+
+  function cycleAppTheme() {
+    const themes = ["system", "light", "dark"];
+    const current = document.documentElement.dataset.appTheme;
+    applyAppTheme(themes[(themes.indexOf(current) + 1) % themes.length]);
   }
 
   function setContentWizardStep(step) {
@@ -1472,7 +1509,13 @@
         updateAccountControls();
       }
       const filename = `${safeFilename(currentProject.name)}-omada-portal.zip`;
-      if (OFFLINE_MODE) await saveOfflineExport(blob, filename);
+      if (OFFLINE_MODE) {
+        const saved = await saveOfflineExport(blob, filename);
+        if (!saved) {
+          showToast("Export canceled. No ZIP file was saved.", true);
+          return;
+        }
+      }
       else {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
@@ -1590,7 +1633,7 @@
     try {
       applyAppTheme(localStorage.getItem("portal-studio-app-theme") || "system");
       window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-        if ($("#app-theme-select").value === "system") applyAppTheme("system");
+        if (document.documentElement.dataset.appTheme === "system") applyAppTheme("system");
       });
       setAuthMode("signin");
       const templateResponse = await fetch("template/index.html");
@@ -1694,9 +1737,12 @@
       const errorText = error.message || String(error);
       const rateLimited = /rate.?limit|too many requests/i.test(errorText);
       message.classList.toggle("warning", rateLimited);
+      const invalidCredentials = !signUp && !recovery && /invalid login credentials/i.test(errorText);
       message.textContent = rateLimited
         ? "Supabase’s email rate limit has been reached. Wait before trying again. For reliable delivery, configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings."
-        : `${recovery ? "Could not update password" : signUp ? "Could not create account" : "Could not sign in"}: ${errorText}`;
+        : invalidCredentials
+          ? "This email/password pair was not accepted. If this admin account previously used sign-in links, use “Forgot password?” to set a password. If no account exists yet, create one with the admin email and verify it before signing in."
+          : `${recovery ? "Could not update password" : signUp ? "Could not create account" : "Could not sign in"}: ${errorText}`;
     } finally {
       button.disabled = false;
     }
@@ -1727,7 +1773,7 @@
       button.disabled = false;
     }
   });
-  $("#app-theme-select").addEventListener("change", event => applyAppTheme(event.currentTarget.value));
+  $("#app-theme-toggle").addEventListener("click", cycleAppTheme);
   $("#admin-dashboard-button").addEventListener("click", showAdminDashboard);
   $("#dashboard-button").addEventListener("click", showDashboard);
   $("#admin-refresh-button").addEventListener("click", refreshAdminDashboard);
