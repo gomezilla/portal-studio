@@ -34,7 +34,7 @@ The live preview opens in mobile size by default; switch to desktop to inspect t
 
 After exporting, Portal Studio shows a dismissible success panel with an optional InstaPay QR contribution. A **Support** button in the header opens the same contribution page anytime. Creating a draft does not interrupt the editor with a donation prompt. The exported portal and Portal Studio include a non-editable “Made by Gomezilla Portal Studio” attribution.
 
-Create an account or sign in with an email and password. Signed-in users and administrators can change their password from the top menu. New accounts may need to verify their email before signing in, depending on the Supabase project's email-confirmation setting. Existing users can use **Forgot password?** to set a password. If Supabase's built-in email service reaches its rate limit, wait before requesting another email; configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings for reliable delivery.
+Create an account or sign in with an email and password. Signed-in users and administrators can change their password from the top menu. New accounts may need to verify their email before signing in, depending on the Supabase project's email-confirmation setting. Existing users can use **Forgot password?** to set a password; the reset link returns to the site and opens the new-password form automatically. In Supabase Authentication → URL Configuration, allow `https://gomezilla.github.io/portal-studio/` as a redirect URL. If Supabase's built-in email service reaches its rate limit, wait before requesting another email; configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings for reliable delivery.
 
 ## Template source
 

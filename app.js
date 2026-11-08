@@ -68,7 +68,7 @@
     { id: "facebook", name: "Facebook", light: ["#f0f2f5", "#ffffff", "#f7f8fa", "#e4e6eb", "#1c1e21", "#65676b", "#dadde1"], dark: ["#18191a", "#242526", "#3a3b3c", "#3a3b3c", "#e4e6eb", "#b0b3b8", "#4e4f50"], accent: "#0866ff", hover: "#0756d1", mode: "light", corners: "rounded" },
     { id: "social-media", name: "Social Media", light: ["#f2f4fb", "#ffffff", "#f8f9ff", "#e9eafd", "#24253a", "#74758b", "#dee0ed"], dark: ["#171827", "#222336", "#2c2e43", "#393b54", "#f3f4ff", "#b2b4cf", "#484a64"], accent: "#6557d2", hover: "#5144b8", mode: "system", corners: "rounded" },
     { id: "youtube", name: "YouTube", light: ["#f5f5f5", "#ffffff", "#fafafa", "#eeeeee", "#202020", "#737373", "#e0e0e0"], dark: ["#0f0f0f", "#181818", "#212121", "#292929", "#f1f1f1", "#aaaaaa", "#3f3f3f"], accent: "#ff0033", hover: "#cc0029", mode: "system", corners: "sharp" },
-    { id: "tiktok", name: "TikTok", light: ["#f3f6f7", "#ffffff", "#f8fbfb", "#e6eeee", "#171b1d", "#68777b", "#d9e3e5"], dark: ["#101214", "#191c1f", "#22262a", "#30363b", "#f5f7f8", "#a9b5b9", "#3b4449"], accent: "#25f4ee", hover: "#13c9c4", mode: "dark", corners: "sharp" },
+    { id: "tiktok", name: "TikTok", light: ["#ffffff", "#ffffff", "#f5f5f5", "#69c9d0", "#010101", "#555555", "#69c9d0"], dark: ["#010101", "#171717", "#212121", "#292929", "#ffffff", "#69c9d0", "#3b3b3b"], accent: "#ee1d52", hover: "#cf1644", mode: "dark", corners: "sharp" },
     { id: "gaming", name: "Gaming / Neon", light: ["#11111b", "#191925", "#20202e", "#29283a", "#f5f3ff", "#aaa7c3", "#38364c"], dark: ["#11111b", "#191925", "#20202e", "#29283a", "#f5f3ff", "#aaa7c3", "#38364c"], accent: "#8055ff", hover: "#6740de", mode: "dark", corners: "sharp" },
     { id: "ocean", name: "Ocean", light: ["#eff6fa", "#ffffff", "#f5f9fb", "#e8f2f7", "#1a2c39", "#687d89", "#dce8ee"], dark: ["#101b25", "#172734", "#1d303d", "#243a48", "#e7f5fc", "#a2b7c2", "#2e4655"], accent: "#087e9d", hover: "#066983", mode: "system", corners: "soft" },
     { id: "sunset", name: "Sunset", light: ["#fbf3ef", "#ffffff", "#fff8f4", "#f7e9e1", "#352a2a", "#897978", "#efdfd6"], dark: ["#211a1b", "#2d2324", "#362a2b", "#443536", "#f8ecea", "#b9a6a4", "#4c3b3d"], accent: "#c75d4c", hover: "#a94b3d", mode: "system", corners: "soft" },
@@ -77,6 +77,8 @@
     { id: "rose", name: "Rose", light: ["#f8f1f5", "#ffffff", "#fbf6f9", "#f2e7ee", "#332631", "#887984", "#ebdfe7"], dark: ["#201920", "#2b202b", "#342835", "#433443", "#f6edf4", "#bbaab9", "#493948"], accent: "#a34d78", hover: "#863c62", mode: "system", corners: "rounded" }
   ];
   const supabaseConfig = window.PORTAL_STUDIO_SUPABASE || {};
+  const passwordRecoveryCallback = new URLSearchParams(window.location.hash.slice(1)).get("type") === "recovery"
+    || new URLSearchParams(window.location.search).get("type") === "recovery";
   const OFFLINE_MODE = window.PORTAL_STUDIO_OFFLINE === true;
   const supabaseClient = window.supabase?.createClient && supabaseConfig.url && supabaseConfig.publishableKey
     ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.publishableKey)
@@ -96,6 +98,7 @@
   let sizeCheckTimer = 0;
   let previewThemeOverride = null;
   let previewDevice = "mobile";
+  let passwordRecoveryPromptShown = false;
   let contentWizardStep = 0;
   const templateAssets = new Map();
   let sizeCheckSequence = 0;
@@ -952,6 +955,15 @@
     $("#auth-form").dataset.mode = mode;
   }
 
+  function showPasswordRecoveryPrompt(session) {
+    if (!session?.user || passwordRecoveryPromptShown) return;
+    passwordRecoveryPromptShown = true;
+    setAuthMode("recovery");
+    $("#auth-email").value = session.user.email || "";
+    const dialog = $("#auth-dialog");
+    if (!dialog.open) dialog.showModal();
+  }
+
   function applyAppTheme(theme) {
     const selected = ["light", "dark", "system"].includes(theme) ? theme : "system";
     document.documentElement.dataset.appTheme = selected;
@@ -1671,6 +1683,11 @@
         }
       });
       setAuthMode("signin");
+      if (!OFFLINE_MODE && supabaseClient) {
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+          if (event === "PASSWORD_RECOVERY") showPasswordRecoveryPrompt(session);
+        });
+      }
       const templateResponse = await fetch("template/index.html");
       if (!templateResponse.ok) throw new Error("The Omada template files could not be loaded.");
       templateHtml = await templateResponse.text();
@@ -1689,17 +1706,13 @@
         if (event === "SIGNED_IN") {
           window.setTimeout(async () => {
             currentUser = session?.user || null;
-            $("#auth-dialog").close();
+            if ($("#auth-form").dataset.mode !== "recovery") $("#auth-dialog").close();
             await loadAccountData();
             if (pendingCreateAfterSignIn) {
               pendingCreateAfterSignIn = false;
               await createProject();
             }
           }, 0);
-        } else if (event === "PASSWORD_RECOVERY") {
-          setAuthMode("recovery");
-          $("#auth-email").value = session?.user?.email || "";
-          $("#auth-dialog").showModal();
         } else if (event === "SIGNED_OUT") {
           currentUser = null;
           projects = [];
@@ -1720,6 +1733,14 @@
       currentUser = sessionData.session?.user || null;
       if (currentUser) await loadAccountData();
       else renderDashboard();
+      if (passwordRecoveryCallback) {
+        if (sessionData.session) {
+          showPasswordRecoveryPrompt(sessionData.session);
+        } else if (!passwordRecoveryPromptShown) {
+          $("#auth-message").textContent = "This password-reset link could not be verified or has expired. Request a new reset link to continue.";
+          $("#auth-dialog").showModal();
+        }
+      }
       $("#loading-indicator")?.remove();
     } catch (error) {
       window.portalStudioSetupError = `Portal Studio could not start securely: ${error.message}.`;
@@ -1793,6 +1814,8 @@
       if (error) throw error;
       if (recovery) {
         message.textContent = "Password updated. You can now sign in with it.";
+        setAuthMode("signin");
+        $("#auth-password").value = "";
         $("#auth-dialog").close();
         showToast("Password updated.");
       } else if (signUp && !data.session) {
