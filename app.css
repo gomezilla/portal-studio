@@ -124,6 +124,19 @@ main { flex: 1; }
 .browser-frame.mobile { width: min(390px, 100%); height: min(740px, 100%); min-height: 500px; }
 .thank-you-dialog { position: relative; width: min(650px, calc(100% - 32px)); max-width: 650px; padding: 31px; border: 1px solid #e8e7ed; border-radius: 18px; color: var(--ink); background: #fff; box-shadow: 0 24px 80px #24203335; }
 .thank-you-dialog::backdrop { background: #201d2c70; backdrop-filter: blur(3px); }
+.features-dialog { position: relative; width: min(920px, calc(100% - 32px)); max-width: 920px; max-height: min(90vh, 900px); padding: 30px; overflow-y: auto; border: 1px solid #e8e7ed; border-radius: 18px; color: var(--ink); background: #fff; box-shadow: 0 24px 80px #24203335; }
+.features-dialog::backdrop { background: #201d2c70; backdrop-filter: blur(3px); }
+.features-heading { max-width: 640px; margin-bottom: 22px; }
+.features-heading h2 { margin: 0 36px 8px 0; font: 750 clamp(22px, 3vw, 29px)/1.2 Manrope, sans-serif; letter-spacing: -.8px; }
+.features-heading > p:last-child { margin: 0; color: #777687; font-size: 12px; line-height: 1.6; }
+.features-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+.feature-card { padding: 15px; border: 1px solid #ecebf0; border-radius: 11px; background: #fcfcfd; }
+.feature-category { display: inline-block; margin-bottom: 8px; color: var(--accent); font-size: 9px; font-weight: 750; letter-spacing: .12em; }
+.feature-card h3 { margin: 0 0 6px; color: #3e3d50; font-size: 13px; font-weight: 700; }
+.feature-card p { margin: 0; color: #777687; font-size: 11px; line-height: 1.65; }
+.feature-card code { color: #5e4d8b; font-size: .95em; }
+.features-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
+.admin-heading-actions { display: flex; gap: 9px; }
 .thank-you-layout { display: grid; grid-template-columns: minmax(0, 1fr) 205px; align-items: center; gap: 26px; }
 .thank-you-copy h2 { margin: 0 0 9px; font: 750 25px/1.2 Manrope, sans-serif; letter-spacing: -.7px; }
 .thank-you-copy > .eyebrow { margin-bottom: 10px; }
@@ -138,6 +151,11 @@ main { flex: 1; }
 @media(max-width: 900px) { .editor { height: auto; min-height: calc(100vh - 106px); } }
 @media(max-width: 680px) {
   .editor { height: auto; min-height: calc(100vh - 96px); }
+  .features-dialog { padding: 24px 18px 18px; }
+  .features-grid { grid-template-columns: 1fr; }
+  .features-heading { margin-bottom: 17px; }
+  .admin-heading-actions { width: 100%; }
+  .admin-heading-actions .button { flex: 1; }
   .preview-toolbar { gap: 8px; padding: 0 10px; }
   .preview-toolbar-actions { gap: 5px; }
   .preview-device-button { padding: 5px 6px; font-size: 9px; }
@@ -186,6 +204,11 @@ html[data-color-scheme="dark"] .topbar, html[data-color-scheme="dark"] .editor-h
 html[data-color-scheme="dark"] .brand, html[data-color-scheme="dark"] .dashboard-heading h1, html[data-color-scheme="dark"] .library-heading h2, html[data-color-scheme="dark"] .empty-state h3, html[data-color-scheme="dark"] .project-name { color: var(--ink); }
 html[data-color-scheme="dark"] .brand-light, html[data-color-scheme="dark"] .muted, html[data-color-scheme="dark"] .privacy-note, html[data-color-scheme="dark"] .preview-caption, html[data-color-scheme="dark"] .panel-footer, html[data-color-scheme="dark"] .count-label { color: #a7a3b2; }
 html[data-color-scheme="dark"] .button-quiet, html[data-color-scheme="dark"] .portal-card, html[data-color-scheme="dark"] .account-panel, html[data-color-scheme="dark"] .admin-requests, html[data-color-scheme="dark"] .admin-users-panel, html[data-color-scheme="dark"] .analytics-card, html[data-color-scheme="dark"] .browser-frame, html[data-color-scheme="dark"] .auth-dialog, html[data-color-scheme="dark"] .thank-you-dialog, html[data-color-scheme="dark"] .image-slot, html[data-color-scheme="dark"] .guide-image-slot { color: var(--ink); border-color: #393744; background: #24222d; }
+html[data-color-scheme="dark"] .features-dialog { color: var(--ink); border-color: #393744; background: #24222d; }
+html[data-color-scheme="dark"] .feature-card { border-color: #393744; background: #211f29; }
+html[data-color-scheme="dark"] .feature-card h3 { color: #edeaf5; }
+html[data-color-scheme="dark"] .features-heading > p:last-child, html[data-color-scheme="dark"] .feature-card p { color: #b6b2c0; }
+html[data-color-scheme="dark"] .feature-card code { color: #d3c4f4; }
 html[data-color-scheme="dark"] .template-banner { border-color: #41394e; background: linear-gradient(110deg, #292432, #211f29 70%); }
 html[data-color-scheme="dark"] .account-setup-warning { color: #e6c18c; border-color: #665234; background: #30281e; }
 html[data-color-scheme="dark"] .account-panel, html[data-color-scheme="dark"] .admin-users-panel, html[data-color-scheme="dark"] .analytics-card { border-color: #393744; }

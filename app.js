@@ -587,7 +587,6 @@
     const savedSlotUnavailable = !OFFLINE_MODE && Boolean(currentUser && (!quota || (!isAdmin && projects.length >= quota.saved_limit)));
     $("#create-button").disabled = !OFFLINE_MODE && (!configured || Boolean(setupError) || savedSlotUnavailable);
     $("#empty-create-button").disabled = !OFFLINE_MODE && (!configured || Boolean(setupError) || savedSlotUnavailable);
-    $("#dashboard-button").hidden = !OFFLINE_MODE && !currentUser;
     $("#admin-dashboard-button").hidden = !isAdmin;
     const passwordChangeButton = $("#password-change-button");
     if (passwordChangeButton) passwordChangeButton.hidden = OFFLINE_MODE || !currentUser;
@@ -893,7 +892,6 @@
     dashboardView.hidden = true;
     editorView.hidden = false;
     document.body.classList.add("editor-active");
-    $("#dashboard-button").hidden = false;
     $("#top-save-button").hidden = false;
     $("#project-name").value = currentProject.name;
     setActiveTab($("#content-tab"));
@@ -919,7 +917,6 @@
     adminDashboardView.hidden = true;
     dashboardView.hidden = false;
     $("#top-save-button").hidden = true;
-    $("#dashboard-button").hidden = true;
     renderDashboard();
   }
 
@@ -930,8 +927,6 @@
     dashboardView.hidden = true;
     adminDashboardView.hidden = false;
     $("#top-save-button").hidden = true;
-    $("#dashboard-button").hidden = false;
-    $("#dashboard-button").textContent = "My portals";
     await refreshAdminDashboard();
     await renderAdminRequests();
     window.scrollTo(0, 0);
@@ -1849,7 +1844,13 @@
   });
   $("#app-theme-toggle").addEventListener("click", cycleAppTheme);
   $("#admin-dashboard-button").addEventListener("click", showAdminDashboard);
-  $("#dashboard-button").addEventListener("click", showDashboard);
+  $("#admin-return-button").addEventListener("click", showDashboard);
+  $("#features-button").addEventListener("click", () => $("#features-dialog").showModal());
+  $("#features-close").addEventListener("click", () => $("#features-dialog").close());
+  $("#features-done").addEventListener("click", () => $("#features-dialog").close());
+  $("#features-dialog").addEventListener("click", event => {
+    if (event.target === event.currentTarget) event.currentTarget.close();
+  });
   $("#admin-refresh-button").addEventListener("click", refreshAdminDashboard);
   const reloadFilteredAdminUsers = () => {
     adminUsersPage = 0;
