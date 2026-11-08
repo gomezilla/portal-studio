@@ -108,6 +108,7 @@
   let sizeCheckTimer = 0;
   let previewDark = false;
   let previewDevice = "mobile";
+  let contentWizardStep = 0;
   const templateAssets = new Map();
   let sizeCheckSequence = 0;
   const ADMIN_PAGE_SIZE = 50;
@@ -881,9 +882,12 @@
   function openEditor() {
     dashboardView.hidden = true;
     editorView.hidden = false;
+    document.body.classList.add("editor-active");
     $("#dashboard-button").hidden = false;
     $("#top-save-button").hidden = false;
     $("#project-name").value = currentProject.name;
+    setActiveTab($("#content-tab"));
+    setContentWizardStep(0);
     renderFields();
     syncAccent();
     renderPlanRows();
@@ -900,6 +904,7 @@
 
   function showDashboard() {
     if (dirty) saveCurrentProject(true);
+    document.body.classList.remove("editor-active");
     editorView.hidden = true;
     adminDashboardView.hidden = true;
     dashboardView.hidden = false;
@@ -910,6 +915,7 @@
 
   async function showAdminDashboard() {
     if (!isAdmin) return;
+    document.body.classList.remove("editor-active");
     editorView.hidden = true;
     dashboardView.hidden = true;
     adminDashboardView.hidden = false;
