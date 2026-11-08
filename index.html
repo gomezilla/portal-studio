@@ -17,13 +17,14 @@
     <div class="topbar-right">
       <span class="save-indicator" id="save-indicator"><i></i> All changes saved</span>
       <span class="account-email" id="account-email" hidden></span>
-      <button class="button button-quiet" id="support-button" type="button">Support</button>
       <button class="button button-quiet" id="sign-in-button" type="button">Sign in</button>
       <button class="button button-quiet" id="sign-out-button" type="button" hidden>Sign out</button>
-      <button class="button button-quiet app-theme-button" id="app-theme-toggle" type="button" aria-label="Appearance: Follow device" title="Appearance: Follow device"><span id="app-theme-icon" aria-hidden="true">◐</span></button>
-      <button class="button button-quiet" id="admin-dashboard-button" type="button" hidden>Admin dashboard</button>
+      <button class="button button-quiet" id="password-change-button" type="button" hidden>Change password</button>
       <button class="button button-quiet" id="dashboard-button" type="button">My portals</button>
+      <button class="button button-quiet" id="admin-dashboard-button" type="button" hidden>Admin dashboard</button>
       <button class="button button-primary" id="top-save-button" type="button" hidden>Save draft</button>
+      <button class="button button-quiet" id="support-button" type="button">Support</button>
+      <button class="button button-quiet app-theme-button" id="app-theme-toggle" type="button" aria-label="Appearance: Follow device" title="Appearance: Follow device"><span id="app-theme-icon" aria-hidden="true">◐</span></button>
     </div>
   </header>
 
@@ -316,6 +317,18 @@
       <p class="auth-message" id="auth-message" aria-live="polite"></p>
       <button class="text-button auth-reset" id="auth-reset" type="button">Forgot password?</button>
       <button class="text-button auth-mode-toggle" id="auth-mode-toggle" type="button">New here? Create an account</button>
+    </form>
+  </dialog>
+  <dialog class="auth-dialog" id="password-change-dialog" aria-labelledby="password-change-title">
+    <form id="password-change-form">
+      <button class="dialog-close" id="password-change-close" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">PORTAL STUDIO ACCOUNT</p>
+      <h2 id="password-change-title">Change your password</h2>
+      <p class="muted">Choose a new password with at least 8 characters.</p>
+      <label class="field" for="new-account-password">New password<input id="new-account-password" type="password" autocomplete="new-password" minlength="8" required></label>
+      <label class="field" for="confirm-account-password">Confirm new password<input id="confirm-account-password" type="password" autocomplete="new-password" minlength="8" required></label>
+      <button class="button button-primary" type="submit" id="password-change-submit">Update password</button>
+      <p class="auth-message" id="password-change-message" aria-live="polite"></p>
     </form>
   </dialog>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

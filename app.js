@@ -573,20 +573,26 @@
     accountEmail.textContent = currentUser?.email || "";
     accountPanel.hidden = OFFLINE_MODE || !configured || Boolean(setupError);
     setupWarning.hidden = OFFLINE_MODE || !setupError;
-    const savedSlotUnavailable = !OFFLINE_MODE && Boolean(currentUser && (!quota || projects.length >= quota.saved_limit));
+    const savedSlotUnavailable = !OFFLINE_MODE && Boolean(currentUser && (!quota || (!isAdmin && projects.length >= quota.saved_limit)));
     $("#create-button").disabled = !OFFLINE_MODE && (!configured || Boolean(setupError) || savedSlotUnavailable);
     $("#empty-create-button").disabled = !OFFLINE_MODE && (!configured || Boolean(setupError) || savedSlotUnavailable);
     $("#dashboard-button").hidden = !OFFLINE_MODE && !currentUser;
     $("#admin-dashboard-button").hidden = !isAdmin;
+    const passwordChangeButton = $("#password-change-button");
+    if (passwordChangeButton) passwordChangeButton.hidden = OFFLINE_MODE || !currentUser;
     const offlineFolderButton = $("#offline-folder-button");
     if (offlineFolderButton) offlineFolderButton.hidden = !OFFLINE_MODE || !window.showDirectoryPicker;
-    $("#quota-summary").textContent = quota
+    $("#quota-summary").textContent = isAdmin
+      ? `Administrator access: unlimited saved portals and exports · Saved: ${projects.length} · Exports used: ${quota?.exports_used ?? 0}`
+      : quota
       ? `Saved portals: ${projects.length} / ${quota.saved_limit} · Exports used: ${quota.exports_used} / ${quota.export_limit}`
       : "Sign in to save and export portals.";
-    $("#quota-request-status").textContent = pendingRequest
-      ? `Your request is ${pendingRequest.status}.`
-      : "Each account starts with one saved portal and one export.";
-    $("#request-access-button").hidden = !currentUser || !quota || Boolean(pendingRequest);
+    $("#quota-request-status").textContent = isAdmin
+      ? "Administrator accounts are not subject to save or export quotas."
+      : pendingRequest
+        ? `Your request is ${pendingRequest.status}.`
+        : "Each account starts with one saved portal and one export.";
+    $("#request-access-button").hidden = isAdmin || !currentUser || !quota || Boolean(pendingRequest);
     $("#admin-requests").hidden = !isAdmin;
   }
 
@@ -801,7 +807,7 @@
       showToast("Your account quota is still loading. Please try again.", true);
       return;
     }
-    if (projects.length >= quota.saved_limit) {
+    if (!isAdmin && projects.length >= quota.saved_limit) {
       showToast("You have reached your saved portal limit. Request additional access from the dashboard.", true);
       return;
     }
@@ -818,7 +824,7 @@
   }
 
   async function duplicateProject(project) {
-    if (!OFFLINE_MODE && (!quota || projects.length >= quota.saved_limit)) {
+    if (!OFFLINE_MODE && (!quota || (!isAdmin && projects.length >= quota.saved_limit))) {
       showToast("You have reached your saved portal limit. Request additional access from the dashboard.", true);
       return;
     }
@@ -1461,7 +1467,7 @@
         bar.classList.add("error");
         status.textContent = `ZIP is ${formatBytes(size)}; it must be under 2 MB. Remove gallery images or replace large images with smaller, optimized files.`;
         button.disabled = true;
-      } else if (!OFFLINE_MODE && quota && quota.exports_used >= quota.export_limit) {
+      } else if (!OFFLINE_MODE && !isAdmin && quota && quota.exports_used >= quota.export_limit) {
         bar.classList.add("warning");
         status.textContent = `ZIP size: ${formatBytes(size)}. Your ${quota.export_limit} export allowance has been used; request additional access from the dashboard.`;
         button.disabled = true;
@@ -1483,7 +1489,7 @@
       showToast("Sign in and load your account quota before exporting.", true);
       return;
     }
-    if (!OFFLINE_MODE && quota.exports_used >= quota.export_limit) {
+    if (!OFFLINE_MODE && !isAdmin && quota.exports_used >= quota.export_limit) {
       showToast("You have used your export allowance. Request additional access from the dashboard.", true);
       return;
     }
@@ -1696,6 +1702,40 @@
   $("#sign-in-button").addEventListener("click", () => $("#auth-dialog").showModal());
   $("#support-button").addEventListener("click", () => showThankYou("support"));
   $("#offline-folder-button")?.addEventListener("click", chooseOfflineExportFolder);
+  $("#password-change-button")?.addEventListener("click", () => {
+    $("#password-change-message").textContent = "";
+    $("#password-change-dialog").showModal();
+  });
+  $("#password-change-close")?.addEventListener("click", () => $("#password-change-dialog").close());
+  $("#password-change-form")?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const password = $("#new-account-password").value;
+    const confirmation = $("#confirm-account-password").value;
+    const message = $("#password-change-message");
+    if (password !== confirmation) {
+      message.textContent = "The passwords do not match.";
+      $("#confirm-account-password").focus();
+      return;
+    }
+    if (!currentUser || !supabaseClient) {
+      message.textContent = "Sign in again before changing your password.";
+      return;
+    }
+    const button = $("#password-change-submit");
+    button.disabled = true;
+    message.textContent = "Updating password…";
+    try {
+      const { error } = await supabaseClient.auth.updateUser({ password });
+      if (error) throw error;
+      $("#password-change-dialog").close();
+      $("#password-change-form").reset();
+      showToast("Your password was changed.");
+    } catch (error) {
+      message.textContent = `Could not change password: ${error.message || String(error)}`;
+    } finally {
+      button.disabled = false;
+    }
+  });
   $("#sign-out-button").addEventListener("click", async () => {
     const { error } = await supabaseClient.auth.signOut();
     if (error) showToast(`Could not sign out: ${error.message}`, true);

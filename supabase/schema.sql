@@ -90,6 +90,11 @@ begin
     raise exception 'You can only save your own portal.';
   end if;
 
+  if public.is_portal_admin() then
+    new.updated_at = now();
+    return new;
+  end if;
+
   insert into public.portal_quotas(user_id)
   values (auth.uid())
   on conflict (user_id) do nothing;
@@ -135,7 +140,11 @@ declare
   quota public.portal_quotas;
 begin
   quota := public.ensure_portal_quota();
-  return query select 1 + quota.extra_templates, 1 + quota.extra_exports, quota.exports_used;
+  if public.is_portal_admin() then
+    return query select 2147483647, 2147483647, quota.exports_used;
+  else
+    return query select 1 + quota.extra_templates, 1 + quota.extra_exports, quota.exports_used;
+  end if;
 end;
 $$;
 
@@ -167,7 +176,7 @@ begin
   where user_id = auth.uid()
   for update;
 
-  if quota.exports_used >= 1 + quota.extra_exports then
+  if not public.is_portal_admin() and quota.exports_used >= 1 + quota.extra_exports then
     raise exception 'You have reached your export limit. Request additional access from the dashboard.';
   end if;
 
