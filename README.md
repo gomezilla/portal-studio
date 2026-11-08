@@ -34,7 +34,7 @@ The live preview opens in mobile size by default; switch to desktop to inspect t
 
 After exporting, Portal Studio shows a dismissible success panel with an optional InstaPay QR contribution. A **Support** button in the header opens the same contribution page anytime. Creating a draft does not interrupt the editor with a donation prompt. The exported portal and Portal Studio include a non-editable “Made by Gomezilla Portal Studio” attribution.
 
-If Supabase's built-in email service reaches its rate limit, wait before requesting another sign-in link. For reliable delivery, configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings.
+Create an account or sign in with an email and password. New accounts may need to verify their email before signing in, depending on the Supabase project's email-confirmation setting. Existing users can use **Forgot password?** to set a password. If Supabase's built-in email service reaches its rate limit, wait before requesting another email; configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings for reliable delivery.
 
 ## Template source
 
@@ -46,17 +46,21 @@ Live site: [https://gomezilla.github.io/portal-studio/](https://gomezilla.github
 
 Source: [github.com/gomezilla/portal-studio](https://github.com/gomezilla/portal-studio)
 
-Supabase must be configured by running the schema and enabling email authentication before visitors can save or export. Until setup is complete, the app fails closed instead of falling back to insecure local quotas.
+Supabase must be configured by running the schema and enabling email/password authentication before visitors can save or export. Until setup is complete, the hosted app fails closed instead of falling back to insecure client-side quotas.
 
 ## Account quotas and approval workflow
 
-The app uses Supabase email magic-link authentication, private image storage, database-enforced one-saved-portal and one-export starting limits, and administrator review of requests for one additional portal/export. The browser publishable key is in `supabase-config.js`; it is designed for public use and is protected by Supabase row-level security. Never put a Supabase service-role key in the website.
+The app uses Supabase email/password authentication, private image storage, database-enforced one-saved-portal and one-export starting limits, and administrator review of requests for one additional portal/export. The browser publishable key is in `supabase-config.js`; it is designed for public use and is protected by Supabase row-level security. Never put a Supabase service-role key in the website.
 
 To activate account saving and approvals for a Supabase project:
 
-1. Enable email sign-in/magic links and sign in once with the verified administrator account `christianzemog@gmail.com`.
+1. Enable email/password sign-in and sign in with the administrator account `christianzemog@gmail.com`.
 2. In Supabase **SQL Editor**, run [`supabase/schema.sql`](./supabase/schema.sql). Its final statement registers the verified administrator email; it is safe to run again.
 3. In **Authentication → URL Configuration**, set the site URL to `https://gomezilla.github.io/portal-studio/` and add it to the redirect URLs.
-4. Users need verified accounts to save or export. If the schema or auth setup is incomplete, account saving/export remain unavailable rather than falling back to an insecure client-side quota.
+4. Configure email confirmation as desired. If the schema or auth setup is incomplete, account saving/export remain unavailable rather than falling back to an insecure client-side quota.
 
-Each approved request grants that account one additional saved portal and one additional export. The administrator reviews pending requests in the dashboard. Approval decisions currently appear in the dashboard; the app does not send email notifications for new requests or approval results. The 2 MB ZIP limit is separate from the per-account export allowance.
+Each approved request grants that account one additional saved portal and one additional export. The administrator can open **Admin dashboard** to view signup dates, account tenure, idle time, saved-template/export counts, analytics, pending requests, and remove non-admin users. User removal permanently deletes their account, drafts, quota records, requests, and uploaded images. The admin dashboard and new SQL RPCs are available only after the current `supabase/schema.sql` has been run. Approval decisions currently appear in the dashboard; the app does not send email notifications for new requests or approval results. The 2 MB ZIP limit is separate from the per-account export allowance.
+
+## Offline copy
+
+A separate no-authentication version is available in `/Users/system32/Documents/omada-portal-studio-offline`. Run `python3 -m http.server 4173` from that folder and open `http://localhost:4173`. It saves drafts and gallery images in browser IndexedDB with no account or template/export-count limits. The strict under-2-MB ZIP limit still applies. In a supported browser, choose the `saved-template/` folder from the editor to write ZIP exports there; otherwise exports use the browser's regular download flow. Browser drafts are local to that browser and can be lost if its site data is cleared, so keep ZIP backups.

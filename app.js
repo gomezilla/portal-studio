@@ -44,9 +44,13 @@
     guideStep1: "1. Open Wi-Fi settings and connect to Prepaid Hotspot or Prepaid Hotspot_2.4G.",
     guideStep2: "2. Select Voucher Access.",
     guideStep3: "3. Enter your voucher code and tap Connect to Wi-Fi.",
+    showHeader: true,
+    showGallery: true,
     showSpeedtest: true,
     showPlans: true,
     showGuide: true,
+    showNote: true,
+    showFooter: true,
     preset: "material",
     accentColor: "#6750a4",
     themeMode: "system",
@@ -67,9 +71,25 @@
     { id: "sunset", name: "Sunset", light: ["#fbf3ef", "#ffffff", "#fff8f4", "#f7e9e1", "#352a2a", "#897978", "#efdfd6"], dark: ["#211a1b", "#2d2324", "#362a2b", "#443536", "#f8ecea", "#b9a6a4", "#4c3b3d"], accent: "#c75d4c", hover: "#a94b3d", mode: "system", corners: "soft" },
     { id: "forest", name: "Forest", light: ["#f0f5f0", "#ffffff", "#f6f9f5", "#e8f0e7", "#243127", "#728174", "#dce6da"], dark: ["#151d18", "#1d2921", "#243128", "#2e3b32", "#eaf3ea", "#aab9ac", "#37483c"], accent: "#347953", hover: "#286441", mode: "system", corners: "soft" },
     { id: "midnight", name: "Midnight", light: ["#eff1f8", "#ffffff", "#f5f6fb", "#e9ebf5", "#20243a", "#73798f", "#dfe2ed"], dark: ["#111521", "#191f2e", "#202738", "#293147", "#eff2ff", "#a7aec3", "#323b52"], accent: "#5369cf", hover: "#4357b6", mode: "dark", corners: "sharp" },
-    { id: "rose", name: "Rose", light: ["#f8f1f5", "#ffffff", "#fbf6f9", "#f2e7ee", "#332631", "#887984", "#ebdfe7"], dark: ["#201920", "#2b202b", "#342835", "#433443", "#f6edf4", "#bbaab9", "#493948"], accent: "#a34d78", hover: "#863c62", mode: "system", corners: "rounded" }
+    { id: "rose", name: "Rose", light: ["#f8f1f5", "#ffffff", "#fbf6f9", "#f2e7ee", "#332631", "#887984", "#ebdfe7"], dark: ["#201920", "#2b202b", "#342835", "#433443", "#f6edf4", "#bbaab9", "#493948"], accent: "#a34d78", hover: "#863c62", mode: "system", corners: "rounded" },
+    { id: "christmas", name: "Christmas", light: ["#f7f2ef", "#ffffff", "#fbf6f2", "#efe2d9", "#26332b", "#747c71", "#e8d9cf"], dark: ["#191d1b", "#242b26", "#2c352e", "#39443a", "#f4eee5", "#b5b7a9", "#465247"], accent: "#a8323e", hover: "#842631", mode: "system", corners: "rounded" },
+    { id: "new-year", name: "New Year", light: ["#f2f3f8", "#ffffff", "#f8f8fc", "#e8eaf3", "#292b3b", "#77798b", "#dfe1eb"], dark: ["#171925", "#222536", "#2a2e42", "#383d55", "#f4f3ff", "#b5b5c8", "#484c64"], accent: "#b28a38", hover: "#8f6c28", mode: "system", corners: "sharp" },
+    { id: "lunar-new-year", name: "Lunar New Year", light: ["#fbf2ee", "#ffffff", "#fff8f4", "#f3dfd8", "#392323", "#8c7068", "#ebd2ca"], dark: ["#211819", "#302020", "#392827", "#4b3230", "#fff1e9", "#c5a69c", "#573c38"], accent: "#c33132", hover: "#9e2527", mode: "system", corners: "rounded" },
+    { id: "valentines", name: "Valentine’s Day", light: ["#fbf1f5", "#ffffff", "#fff8fa", "#f4e3eb", "#3b2732", "#8b7381", "#ebd6e0"], dark: ["#211921", "#30232e", "#3a2a38", "#4a3547", "#fff0f7", "#c0a8b7", "#594253"], accent: "#bd477a", hover: "#993863", mode: "system", corners: "rounded" },
+    { id: "spring", name: "Spring", light: ["#f1f7f1", "#ffffff", "#f8fbf6", "#e5efdf", "#28342a", "#758276", "#d9e5d4"], dark: ["#171f19", "#222c24", "#29352b", "#38463a", "#eff8ed", "#b0c0af", "#465649"], accent: "#56894c", hover: "#426e3b", mode: "system", corners: "soft" },
+    { id: "summer", name: "Summer", light: ["#f1f7fb", "#ffffff", "#f8fbfd", "#e4f0f6", "#213544", "#6f8792", "#d5e5eb"], dark: ["#14202a", "#1e2d38", "#253642", "#344854", "#edf8fc", "#a9c1cb", "#425a66"], accent: "#e28a36", hover: "#bd6c25", mode: "system", corners: "rounded" },
+    { id: "fourth-of-july", name: "Fourth of July", light: ["#f2f4f8", "#ffffff", "#f8f9fc", "#e6eaf1", "#252d3b", "#727c8d", "#d8dfe9"], dark: ["#171b24", "#222936", "#2a3241", "#394456", "#f2f5fb", "#b1bac8", "#48566b"], accent: "#ba3e4b", hover: "#96313c", mode: "system", corners: "sharp" },
+    { id: "thanksgiving", name: "Thanksgiving", light: ["#f8f3ed", "#ffffff", "#fcf8f2", "#efe4d5", "#352e25", "#86796a", "#e5d8c8"], dark: ["#211c18", "#302720", "#3b3026", "#4b3b2d", "#f8efe2", "#beaa91", "#5a4838"], accent: "#b66b35", hover: "#925327", mode: "system", corners: "soft" },
+    { id: "halloween", name: "Halloween", light: ["#f5f1f8", "#ffffff", "#faf7fc", "#ebe3f0", "#2d2637", "#82778d", "#e0d6e8"], dark: ["#17141d", "#231d2b", "#2c2436", "#3b2e49", "#f5efff", "#b4a7c3", "#4b3d5a"], accent: "#dd762e", hover: "#b85c1e", mode: "dark", corners: "sharp" },
+    { id: "ph-independence", name: "PH Independence", light: ["#f2f5f2", "#ffffff", "#f8faf8", "#e5eee7", "#26332b", "#758177", "#d9e5dc"], dark: ["#171d1a", "#222a25", "#2b342e", "#39463d", "#f2f8f3", "#b0bcb2", "#48574b"], accent: "#1c6b51", hover: "#165540", mode: "system", corners: "soft" },
+    { id: "buwan-wika", name: "Buwan ng Wika", light: ["#f8f2ed", "#ffffff", "#fcf8f4", "#efe2d5", "#342b26", "#82766d", "#e4d7ca"], dark: ["#201a18", "#2e2420", "#392c25", "#4a392e", "#fbf1e7", "#bca995", "#594638"], accent: "#c14f3d", hover: "#9d3d2e", mode: "system", corners: "rounded" },
+    { id: "sinulog", name: "Sinulog", light: ["#f8f2ef", "#ffffff", "#fcf8f4", "#efe3d8", "#362a24", "#84766c", "#e4d6ca"], dark: ["#211a17", "#30231e", "#3a2b24", "#4b392e", "#fbf0e5", "#bda995", "#5b4638"], accent: "#d14a32", hover: "#ab3827", mode: "system", corners: "rounded" },
+    { id: "rainy-season", name: "Rainy Season", light: ["#eff4f7", "#ffffff", "#f7fafb", "#e1ebf0", "#25343c", "#71818a", "#d2e0e6"], dark: ["#151d22", "#202a31", "#29353d", "#37464f", "#eef6f8", "#afbec4", "#465862"], accent: "#397d91", hover: "#2b6374", mode: "system", corners: "soft" },
+    { id: "pahiyas", name: "Pahiyas", light: ["#f8f4eb", "#ffffff", "#fcf9f1", "#eee6ce", "#353126", "#827b67", "#e5dbc0"], dark: ["#201e18", "#2d2a20", "#383326", "#494231", "#f8f2df", "#bdb394", "#5b523c"], accent: "#61934c", hover: "#4b753a", mode: "system", corners: "rounded" },
+    { id: "eid", name: "Eid Celebration", light: ["#eff6f2", "#ffffff", "#f7fbf8", "#e1eee6", "#24362e", "#71857b", "#d2e3d8"], dark: ["#141e19", "#1e2b23", "#26352b", "#344638", "#eef8f1", "#afc2b4", "#43594a"], accent: "#39846a", hover: "#2b6953", mode: "system", corners: "soft" }
   ];
   const supabaseConfig = window.PORTAL_STUDIO_SUPABASE || {};
+  const OFFLINE_MODE = window.PORTAL_STUDIO_OFFLINE === true;
   const supabaseClient = window.supabase?.createClient && supabaseConfig.url && supabaseConfig.publishableKey
     ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.publishableKey)
     : null;
@@ -90,14 +110,125 @@
   let previewDevice = "mobile";
   const templateAssets = new Map();
   let sizeCheckSequence = 0;
+  const ADMIN_PAGE_SIZE = 50;
+  let adminUsersPage = 0;
+  let adminUsers = [];
+  let adminTotalUsers = 0;
+  let localDatabasePromise;
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const dashboardView = $("#dashboard-view");
+  const adminDashboardView = $("#admin-dashboard-view");
   const editorView = $("#editor-view");
   const toast = $("#toast");
   const saveIndicator = $("#save-indicator");
   const previewFrame = $("#portal-preview");
+
+  function openLocalDatabase() {
+    if (!localDatabasePromise) {
+      localDatabasePromise = new Promise((resolve, reject) => {
+        const request = indexedDB.open("portal-studio-offline", 2);
+        request.onupgradeneeded = () => {
+          if (!request.result.objectStoreNames.contains("projects")) {
+            request.result.createObjectStore("projects", { keyPath: "id" });
+          }
+          if (!request.result.objectStoreNames.contains("settings")) {
+            request.result.createObjectStore("settings", { keyPath: "key" });
+          }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error("Could not open offline draft storage."));
+      });
+    }
+    return localDatabasePromise;
+  }
+
+  async function storeLocalProject(project) {
+    const database = await openLocalDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction("projects", "readwrite");
+      transaction.objectStore("projects").put(project);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error("Could not save this offline draft."));
+      transaction.onabort = () => reject(transaction.error || new Error("Offline draft storage transaction was aborted."));
+    });
+  }
+
+  async function loadLocalProjects() {
+    const database = await openLocalDatabase();
+    return new Promise((resolve, reject) => {
+      const request = database.transaction("projects", "readonly").objectStore("projects").getAll();
+      request.onsuccess = () => resolve(request.result.map(normalizeProject));
+      request.onerror = () => reject(request.error || new Error("Could not read offline drafts."));
+    });
+  }
+
+  async function deleteLocalProject(id) {
+    const database = await openLocalDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction("projects", "readwrite");
+      transaction.objectStore("projects").delete(id);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error("Could not delete this offline draft."));
+      transaction.onabort = () => reject(transaction.error || new Error("Offline draft deletion was aborted."));
+    });
+  }
+
+  async function getLocalSetting(key) {
+    const database = await openLocalDatabase();
+    return new Promise((resolve, reject) => {
+      const request = database.transaction("settings", "readonly").objectStore("settings").get(key);
+      request.onsuccess = () => resolve(request.result?.value);
+      request.onerror = () => reject(request.error || new Error("Could not read offline settings."));
+    });
+  }
+
+  async function setLocalSetting(key, value) {
+    const database = await openLocalDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction("settings", "readwrite");
+      transaction.objectStore("settings").put({ key, value });
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error("Could not save offline settings."));
+      transaction.onabort = () => reject(transaction.error || new Error("Offline settings transaction was aborted."));
+    });
+  }
+
+  async function chooseOfflineExportFolder() {
+    if (!window.showDirectoryPicker) {
+      showToast("This browser cannot save directly to a folder. Exported ZIP files will download normally.", true);
+      return;
+    }
+    try {
+      const directory = await window.showDirectoryPicker({ mode: "readwrite" });
+      const permission = await directory.requestPermission({ mode: "readwrite" });
+      if (permission !== "granted") throw new Error("Folder write permission was not granted.");
+      await setLocalSetting("export-directory", directory);
+      showToast("Exports will be saved in the selected folder.");
+    } catch (error) {
+      if (error.name !== "AbortError") showToast(`Could not select the export folder: ${error.message}`, true);
+    }
+  }
+
+  async function saveOfflineExport(blob, filename) {
+    const directory = await getLocalSetting("export-directory");
+    if (directory && await directory.queryPermission({ mode: "readwrite" }) === "granted") {
+      const file = await directory.getFileHandle(filename, { create: true });
+      const writable = await file.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true;
+    }
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    if (directory) showToast("Folder permission expired. The ZIP was downloaded instead; select the folder again to save directly.", true);
+    return false;
+  }
 
   function freshProject() {
     const now = new Date().toISOString();
@@ -110,6 +241,131 @@
       images: IMAGE_PATHS.map(path => ({ src: path, name: path.split("/").pop() })),
       guideImages: GUIDE_IMAGE_PATHS.map(path => ({ src: path, name: path.split("/").pop() }))
     };
+  }
+
+  async function refreshAdminDashboard() {
+    try {
+      const { data: analytics, error: analyticsError } = await supabaseClient.rpc("get_portal_admin_analytics");
+      if (analyticsError) throw analyticsError;
+      $("#metric-users").textContent = Number(analytics.total_users).toLocaleString();
+      $("#metric-active").textContent = Number(analytics.active_users_30d).toLocaleString();
+      $("#metric-templates").textContent = Number(analytics.saved_templates).toLocaleString();
+      $("#metric-exports").textContent = Number(analytics.exports_used).toLocaleString();
+      $("#metric-signups").textContent = Number(analytics.signups_30d).toLocaleString();
+      $("#metric-requests").textContent = Number(analytics.pending_requests).toLocaleString();
+      adminTotalUsers = Number(analytics.total_users);
+      await loadAdminUsers();
+    } catch (error) {
+      showToast(`Could not load admin analytics: ${error.message}`, true);
+    }
+  }
+
+  async function loadAdminUsers() {
+    const body = $("#admin-user-rows");
+    body.replaceChildren();
+    const { data, error } = await supabaseClient.rpc("list_portal_admin_users", {
+      p_limit: ADMIN_PAGE_SIZE,
+      p_offset: adminUsersPage * ADMIN_PAGE_SIZE
+    });
+    if (error) throw error;
+    adminUsers = data || [];
+    renderAdminUsers();
+  }
+
+  function durationLabel(from, to = new Date()) {
+    const days = Math.max(0, Math.floor((to.getTime() - new Date(from).getTime()) / 86_400_000));
+    const years = Math.floor(days / 365);
+    const months = Math.floor((days % 365) / 30);
+    if (years) return `${days} days · ${years}y ${months}mo`;
+    if (months) return `${days} days · ${months}mo`;
+    return `${days} days`;
+  }
+
+  function renderAdminUsers() {
+    const body = $("#admin-user-rows");
+    const query = $("#admin-user-search").value.trim().toLowerCase();
+    const filtered = adminUsers.filter(user => user.email.toLowerCase().includes(query));
+    const start = adminUsers.length ? adminUsersPage * ADMIN_PAGE_SIZE + 1 : 0;
+    const end = Math.min((adminUsersPage + 1) * ADMIN_PAGE_SIZE, adminTotalUsers);
+    $("#admin-user-count").textContent = `${start}–${end} of ${adminTotalUsers}`;
+    $("#admin-users-page").textContent = `Page ${adminUsersPage + 1}`;
+    $("#admin-users-prev").disabled = adminUsersPage === 0;
+    $("#admin-users-next").disabled = end >= adminTotalUsers;
+    if (!filtered.length) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 7;
+      cell.textContent = query ? "No users on this page match that email." : "No users found.";
+      row.append(cell);
+      body.append(row);
+      return;
+    }
+    filtered.forEach(user => {
+      const row = document.createElement("tr");
+      const email = document.createElement("td");
+      email.textContent = user.email;
+      const templates = document.createElement("td");
+      templates.textContent = Number(user.templates_saved).toLocaleString();
+      const exports = document.createElement("td");
+      exports.textContent = Number(user.exports_used).toLocaleString();
+      const signedUp = document.createElement("td");
+      signedUp.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(user.signed_up_at));
+      const tenure = document.createElement("td");
+      tenure.textContent = durationLabel(user.signed_up_at);
+      const idle = document.createElement("td");
+      idle.textContent = user.last_sign_in_at ? durationLabel(user.last_sign_in_at) : "Never signed in";
+      const action = document.createElement("td");
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "image-action remove";
+      remove.textContent = "Remove";
+      remove.disabled = user.is_admin;
+      remove.title = remove.disabled ? "Administrator accounts cannot be removed here" : "Remove this user and their saved portals";
+      remove.addEventListener("click", () => removeAdminUser(user));
+      action.append(remove);
+      row.append(email, templates, exports, signedUp, tenure, idle, action);
+      body.append(row);
+    });
+  }
+
+  async function removeUserImages(userId) {
+    const storage = supabaseClient.storage.from("portal-images");
+    const projectFolders = [];
+    for (let offset = 0; ; offset += 100) {
+      const { data, error } = await storage.list(userId, { limit: 100, offset });
+      if (error) throw error;
+      projectFolders.push(...(data || []));
+      if (!data || data.length < 100) break;
+    }
+    const paths = [];
+    for (const folder of projectFolders) {
+      for (let offset = 0; ; offset += 100) {
+        const { data, error } = await storage.list(`${userId}/${folder.name}`, { limit: 100, offset });
+        if (error) throw error;
+        paths.push(...(data || []).map(file => `${userId}/${folder.name}/${file.name}`));
+        if (!data || data.length < 100) break;
+      }
+    }
+    for (let index = 0; index < paths.length; index += 100) {
+      const { error } = await storage.remove(paths.slice(index, index + 100));
+      if (error) throw error;
+    }
+  }
+
+  async function removeAdminUser(user) {
+    const confirmed = window.confirm(
+      `Permanently remove ${user.email} and delete their saved portals, usage records, and uploaded images? This cannot be undone.`
+    );
+    if (!confirmed) return;
+    try {
+      await removeUserImages(user.account_id);
+      const { error } = await supabaseClient.rpc("remove_portal_user", { p_user_id: user.account_id });
+      if (error) throw error;
+      showToast(`Removed ${user.email}.`);
+      await refreshAdminDashboard();
+    } catch (error) {
+      showToast(`Could not remove user: ${error.message}`, true);
+    }
   }
 
   function renderGuideImageSlots() {
@@ -213,17 +469,18 @@
   }
 
   async function saveCurrentProject(silent = false) {
-    if (!currentProject || !currentUser || !quota) return false;
+    if (!currentProject || (!OFFLINE_MODE && (!currentUser || !quota))) return false;
     window.clearTimeout(saveTimer);
     currentProject.name = ($("#project-name").value.trim() || "Untitled Wi-Fi Portal").slice(0, 70);
     currentProject.updatedAt = new Date().toISOString();
     try {
-      await persistCloudProject(currentProject);
+      if (OFFLINE_MODE) await storeLocalProject(currentProject);
+      else await persistCloudProject(currentProject);
       dirty = false;
       saveIndicator.classList.remove("unsaved");
       saveIndicator.lastChild.textContent = " All changes saved";
       renderDashboard();
-      if (!silent) showToast("Draft saved on this device.");
+      if (!silent) showToast(OFFLINE_MODE ? "Draft saved in this browser." : "Draft saved to your account.");
       return true;
     } catch (error) {
       dirty = true;
@@ -283,15 +540,19 @@
     const setupError = window.portalStudioSetupError || "";
     setupWarning.hidden = !setupError;
     if (setupError) setupWarning.textContent = setupError;
-    signInButton.hidden = !configured || Boolean(currentUser);
-    signOutButton.hidden = !configured || !currentUser;
+    signInButton.hidden = OFFLINE_MODE || !configured || Boolean(currentUser);
+    signOutButton.hidden = OFFLINE_MODE || !configured || !currentUser;
     accountEmail.hidden = !currentUser;
     accountEmail.textContent = currentUser?.email || "";
-    accountPanel.hidden = !configured || Boolean(setupError);
-    const savedSlotUnavailable = Boolean(currentUser && (!quota || projects.length >= quota.saved_limit));
-    $("#create-button").disabled = !configured || Boolean(setupError) || savedSlotUnavailable;
-    $("#empty-create-button").disabled = !configured || Boolean(setupError) || savedSlotUnavailable;
-    $("#dashboard-button").hidden = !currentUser;
+    accountPanel.hidden = OFFLINE_MODE || !configured || Boolean(setupError);
+    setupWarning.hidden = OFFLINE_MODE || !setupError;
+    const savedSlotUnavailable = !OFFLINE_MODE && Boolean(currentUser && (!quota || projects.length >= quota.saved_limit));
+    $("#create-button").disabled = !OFFLINE_MODE && (!configured || Boolean(setupError) || savedSlotUnavailable);
+    $("#empty-create-button").disabled = !OFFLINE_MODE && (!configured || Boolean(setupError) || savedSlotUnavailable);
+    $("#dashboard-button").hidden = !OFFLINE_MODE && !currentUser;
+    $("#admin-dashboard-button").hidden = !isAdmin;
+    const offlineFolderButton = $("#offline-folder-button");
+    if (offlineFolderButton) offlineFolderButton.hidden = !OFFLINE_MODE || !window.showDirectoryPicker;
     $("#quota-summary").textContent = quota
       ? `Saved portals: ${projects.length} / ${quota.saved_limit} · Exports used: ${quota.exports_used} / ${quota.export_limit}`
       : "Sign in to save and export portals.";
@@ -332,7 +593,9 @@
       window.portalStudioSetupError = "";
       updateAccountControls();
       renderDashboard();
-      if (isAdmin) await renderAdminRequests();
+      if (isAdmin) {
+        await Promise.all([renderAdminRequests(), refreshAdminDashboard()]);
+      }
     } catch (error) {
       quota = null;
       window.portalStudioSetupError = `Account storage is not ready: ${error.message}. Run supabase/schema.sql in the Supabase SQL Editor and complete the setup steps in README.`;
@@ -489,6 +752,18 @@
   }
 
   async function createProject() {
+    if (OFFLINE_MODE) {
+      currentProject = freshProject();
+      try {
+        await storeLocalProject(currentProject);
+        projects.push(currentProject);
+        openEditor();
+      } catch (error) {
+        currentProject = null;
+        showToast(`Could not create an offline draft: ${error.message}`, true);
+      }
+      return;
+    }
     if (!currentUser) {
       pendingCreateAfterSignIn = true;
       $("#auth-message").textContent = "Sign in to continue creating your portal.";
@@ -516,7 +791,7 @@
   }
 
   async function duplicateProject(project) {
-    if (!quota || projects.length >= quota.saved_limit) {
+    if (!OFFLINE_MODE && (!quota || projects.length >= quota.saved_limit)) {
       showToast("You have reached your saved portal limit. Request additional access from the dashboard.", true);
       return;
     }
@@ -526,7 +801,8 @@
     duplicate.createdAt = new Date().toISOString();
     duplicate.updatedAt = duplicate.createdAt;
     try {
-      await persistCloudProject(duplicate);
+      if (OFFLINE_MODE) await storeLocalProject(duplicate);
+      else await persistCloudProject(duplicate);
       projects.push(duplicate);
       renderDashboard();
       showToast("Portal duplicated.");
@@ -538,20 +814,24 @@
   async function deleteProject(project) {
     if (!window.confirm(`Delete "${project.name || "Untitled Wi-Fi Portal"}"? This cannot be undone.`)) return;
     try {
-      const { error: remoteError } = await supabaseClient.from("portal_drafts")
-        .delete().eq("id", project.id).eq("user_id", currentUser.id);
-      if (remoteError) throw remoteError;
-      remoteDraftIds.delete(project.id);
-      const folder = `${currentUser.id}/${safeFilename(project.id)}`;
-      const { data: objects, error: listError } = await supabaseClient.storage.from("portal-images").list(folder);
-      if (listError) throw listError;
-      if (objects.length) {
-        const { error: removeError } = await supabaseClient.storage.from("portal-images")
-          .remove(objects.map(object => `${folder}/${object.name}`));
-        if (removeError) throw removeError;
+      if (OFFLINE_MODE) {
+        await deleteLocalProject(project.id);
+      } else {
+        const { error: remoteError } = await supabaseClient.from("portal_drafts")
+          .delete().eq("id", project.id).eq("user_id", currentUser.id);
+        if (remoteError) throw remoteError;
+        remoteDraftIds.delete(project.id);
+        const folder = `${currentUser.id}/${safeFilename(project.id)}`;
+        const { data: objects, error: listError } = await supabaseClient.storage.from("portal-images").list(folder);
+        if (listError) throw listError;
+        if (objects.length) {
+          const { error: removeError } = await supabaseClient.storage.from("portal-images")
+            .remove(objects.map(object => `${folder}/${object.name}`));
+          if (removeError) throw removeError;
+        }
       }
       projects = projects.filter(item => item.id !== project.id);
-      quota = { ...quota, saved_limit: quota.saved_limit };
+      if (!OFFLINE_MODE && quota) quota = { ...quota, saved_limit: quota.saved_limit };
       renderDashboard();
       showToast("Portal deleted.");
     } catch (error) {
@@ -588,10 +868,75 @@
   function showDashboard() {
     if (dirty) saveCurrentProject(true);
     editorView.hidden = true;
+    adminDashboardView.hidden = true;
     dashboardView.hidden = false;
     $("#top-save-button").hidden = true;
     $("#dashboard-button").hidden = true;
     renderDashboard();
+  }
+
+  async function showAdminDashboard() {
+    if (!isAdmin) return;
+    editorView.hidden = true;
+    dashboardView.hidden = true;
+    adminDashboardView.hidden = false;
+    $("#top-save-button").hidden = true;
+    $("#dashboard-button").hidden = false;
+    $("#dashboard-button").textContent = "My portals";
+    await refreshAdminDashboard();
+    await renderAdminRequests();
+    window.scrollTo(0, 0);
+  }
+
+  function setAuthMode(mode) {
+    const signUp = mode === "signup";
+    const recovery = mode === "recovery";
+    $("#auth-title").textContent = recovery ? "Set a new password" : signUp ? "Create your account" : "Sign in to save your work";
+    $("#auth-description").textContent = recovery
+      ? "Choose a new password for your Portal Studio account."
+      : signUp
+      ? "Create an account with your email and a password to save and export portals."
+      : "Sign in with your email and password. Your saved portals and export allowance follow your account.";
+    $("#auth-submit").textContent = recovery ? "Update password" : signUp ? "Create account" : "Sign in";
+    $("#auth-mode-toggle").textContent = signUp ? "Already have an account? Sign in" : "New here? Create an account";
+    $("#auth-mode-toggle").hidden = recovery;
+    $("#auth-password").autocomplete = signUp || recovery ? "new-password" : "current-password";
+    $("#auth-password").setAttribute("minlength", signUp || recovery ? "8" : "1");
+    $("#auth-reset").hidden = signUp || recovery;
+    $("#auth-message").textContent = "";
+    $("#auth-message").classList.remove("warning");
+    $("#auth-form").dataset.mode = mode;
+  }
+
+  function applyAppTheme(theme) {
+    const selected = ["light", "dark", "system"].includes(theme) ? theme : "system";
+    document.documentElement.dataset.appTheme = selected;
+    document.documentElement.dataset.colorScheme = selected === "system"
+      ? window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+      : selected;
+    $("#app-theme-select").value = selected;
+    localStorage.setItem("portal-studio-app-theme", selected);
+  }
+
+  function setContentWizardStep(step) {
+    contentWizardStep = Math.max(0, Math.min(4, step));
+    const titles = ["Portal basics", "Access and speed", "Plans and pricing", "Connection guide", "Finishing touches"];
+    const descriptions = [
+      "Start with your portal name and welcome message.",
+      "Customize network status while keeping the access method available.",
+      "Set up plan labels and pricing rows.",
+      "Write instructions and manage their sample images.",
+      "Add optional notes and a custom footer message."
+    ];
+    $$("[data-content-step]").forEach(panel => {
+      panel.hidden = Number(panel.dataset.contentStep) !== contentWizardStep;
+    });
+    $(".section-intro .step-number").textContent = `0${contentWizardStep + 1}`;
+    $("#content-step-title").textContent = titles[contentWizardStep];
+    $("#content-step-description").textContent = descriptions[contentWizardStep];
+    $("#content-step-count").textContent = `Step ${contentWizardStep + 1} of ${titles.length}`;
+    $("#content-step-back").disabled = contentWizardStep === 0;
+    $("#content-step-next").textContent = contentWizardStep === titles.length - 1 ? "Done" : "Next";
   }
 
   function renderFields() {
@@ -873,12 +1218,15 @@
     }
 
     const visibility = [
+      [".header", settings.showHeader !== false],
+      [".carousel", settings.showGallery !== false],
       [".speed-card", settings.showSpeedtest],
       [".content", settings.showPlans, 0],
       [".content", settings.showGuide, 1],
       [".collapsible", settings.showPlans, 0],
       [".collapsible", settings.showGuide, 1],
-      [".notes", Boolean(settings.note)]
+      [".notes", settings.showNote !== false && Boolean(settings.note)],
+      [".footer-note", settings.showFooter !== false]
     ];
     visibility.forEach(([selector, visible, index]) => {
       const element = index === undefined ? query(selector) : doc.querySelectorAll(selector)[index];
@@ -991,7 +1339,7 @@
     $("#thank-you-title").textContent = isSupport ? "Support Portal Studio" : "Export complete";
     $("#thank-you-description").textContent = isSupport
       ? "If Portal Studio has been useful, you can optionally contribute to support its continued development."
-      : "Your Omada ZIP is downloading, and your draft is saved. You can continue editing or return to your portals.";
+      : "Your Omada ZIP is ready, and your draft is saved. You can continue editing or return to your portals.";
     $("#thank-you-continue").textContent = isSupport ? "Close" : "Continue editing";
     $("#thank-you-dashboard").hidden = isSupport;
     dialog.showModal();
@@ -1076,7 +1424,7 @@
         bar.classList.add("error");
         status.textContent = `ZIP is ${formatBytes(size)}; it must be under 2 MB. Remove gallery images or replace large images with smaller, optimized files.`;
         button.disabled = true;
-      } else if (quota && quota.exports_used >= quota.export_limit) {
+      } else if (!OFFLINE_MODE && quota && quota.exports_used >= quota.export_limit) {
         bar.classList.add("warning");
         status.textContent = `ZIP size: ${formatBytes(size)}. Your ${quota.export_limit} export allowance has been used; request additional access from the dashboard.`;
         button.disabled = true;
@@ -1094,11 +1442,11 @@
 
   async function exportProject() {
     if (!currentProject || !templateHtml) return;
-    if (!currentUser || !quota) {
+    if (!OFFLINE_MODE && (!currentUser || !quota)) {
       showToast("Sign in and load your account quota before exporting.", true);
       return;
     }
-    if (quota.exports_used >= quota.export_limit) {
+    if (!OFFLINE_MODE && quota.exports_used >= quota.export_limit) {
       showToast("You have used your export allowance. Request additional access from the dashboard.", true);
       return;
     }
@@ -1115,18 +1463,24 @@
         throw new Error("The portal ZIP exceeds the 2 MB limit.");
       }
       const blob = makeZip(files);
-      const { data: exportsUsed, error: reserveError } = await supabaseClient.rpc("reserve_portal_export", {
-        p_draft_id: currentProject.id
-      });
-      if (reserveError) throw reserveError;
-      quota = { ...quota, exports_used: exportsUsed };
-      updateAccountControls();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `${safeFilename(currentProject.name)}-omada-portal.zip`;
-      anchor.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (!OFFLINE_MODE) {
+        const { data: exportsUsed, error: reserveError } = await supabaseClient.rpc("reserve_portal_export", {
+          p_draft_id: currentProject.id
+        });
+        if (reserveError) throw reserveError;
+        quota = { ...quota, exports_used: exportsUsed };
+        updateAccountControls();
+      }
+      const filename = `${safeFilename(currentProject.name)}-omada-portal.zip`;
+      if (OFFLINE_MODE) await saveOfflineExport(blob, filename);
+      else {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = filename;
+        anchor.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
       showThankYou("exported");
     } catch (error) {
       showToast(`Could not export portal: ${error.message}`, true);
@@ -1234,9 +1588,20 @@
 
   async function initialize() {
     try {
+      applyAppTheme(localStorage.getItem("portal-studio-app-theme") || "system");
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+        if ($("#app-theme-select").value === "system") applyAppTheme("system");
+      });
+      setAuthMode("signin");
       const templateResponse = await fetch("template/index.html");
       if (!templateResponse.ok) throw new Error("The Omada template files could not be loaded.");
       templateHtml = await templateResponse.text();
+      if (OFFLINE_MODE) {
+        projects = await loadLocalProjects();
+        renderDashboard();
+        $("#loading-indicator")?.remove();
+        return;
+      }
       if (!supabaseClient) {
         window.portalStudioSetupError = "Secure account saving is unavailable: Supabase client configuration could not be loaded.";
         renderDashboard();
@@ -1253,6 +1618,10 @@
               await createProject();
             }
           }, 0);
+        } else if (event === "PASSWORD_RECOVERY") {
+          setAuthMode("recovery");
+          $("#auth-email").value = session?.user?.email || "";
+          $("#auth-dialog").showModal();
         } else if (event === "SIGNED_OUT") {
           currentUser = null;
           projects = [];
@@ -1263,6 +1632,7 @@
           remoteDraftIds.clear();
           editorView.hidden = true;
           dashboardView.hidden = false;
+          adminDashboardView.hidden = true;
           $("#top-save-button").hidden = true;
           renderDashboard();
         }
@@ -1282,35 +1652,100 @@
 
   $("#sign-in-button").addEventListener("click", () => $("#auth-dialog").showModal());
   $("#support-button").addEventListener("click", () => showThankYou("support"));
+  $("#offline-folder-button")?.addEventListener("click", chooseOfflineExportFolder);
   $("#sign-out-button").addEventListener("click", async () => {
     const { error } = await supabaseClient.auth.signOut();
     if (error) showToast(`Could not sign out: ${error.message}`, true);
   });
   $("#auth-close").addEventListener("click", () => $("#auth-dialog").close());
+  $("#auth-mode-toggle").addEventListener("click", () => {
+    setAuthMode($("#auth-form").dataset.mode === "signup" ? "signin" : "signup");
+  });
   $("#auth-form").addEventListener("submit", async event => {
     event.preventDefault();
     const button = $("#auth-submit");
     const message = $("#auth-message");
     button.disabled = true;
     message.classList.remove("warning");
-    message.textContent = "Sending your secure sign-in link…";
+    const signUp = event.currentTarget.dataset.mode === "signup";
+    const recovery = event.currentTarget.dataset.mode === "recovery";
+    message.textContent = recovery ? "Updating your password…" : signUp ? "Creating your account…" : "Signing in…";
     try {
-      const { error } = await supabaseClient.auth.signInWithOtp({
-        email: $("#auth-email").value.trim(),
-        options: { emailRedirectTo: window.location.origin + window.location.pathname }
-      });
+      const email = $("#auth-email").value.trim();
+      const password = $("#auth-password").value;
+      const { data, error } = recovery
+        ? await supabaseClient.auth.updateUser({ password })
+        : signUp
+          ? await supabaseClient.auth.signUp({ email, password })
+          : await supabaseClient.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      message.textContent = "Check your email for the sign-in link, then return to this page.";
+      if (recovery) {
+        message.textContent = "Password updated. You can now sign in with it.";
+        $("#auth-dialog").close();
+        showToast("Password updated.");
+      } else if (signUp && !data.session) {
+        message.textContent = "Account created. Check your email to verify the address, then sign in with your password.";
+      } else if (signUp) {
+        message.textContent = "Account created. Signing you in…";
+      } else {
+        message.textContent = "Signed in.";
+      }
     } catch (error) {
       const errorText = error.message || String(error);
       const rateLimited = /rate.?limit|too many requests/i.test(errorText);
       message.classList.toggle("warning", rateLimited);
       message.textContent = rateLimited
         ? "Supabase’s email rate limit has been reached. Wait before trying again. For reliable delivery, configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings."
-        : `Could not send sign-in link: ${errorText}`;
+        : `${recovery ? "Could not update password" : signUp ? "Could not create account" : "Could not sign in"}: ${errorText}`;
     } finally {
       button.disabled = false;
     }
+  });
+  $("#auth-reset").addEventListener("click", async () => {
+    const email = $("#auth-email").value.trim();
+    const message = $("#auth-message");
+    const button = $("#auth-reset");
+    if (!email) {
+      message.textContent = "Enter your email address first.";
+      $("#auth-email").focus();
+      return;
+    }
+    button.disabled = true;
+    message.textContent = "Requesting a password reset…";
+    try {
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname
+      });
+      if (error) throw error;
+      message.textContent = "If an account exists for that email, a password reset message will be sent.";
+    } catch (error) {
+      const errorText = error.message || String(error);
+      message.textContent = /rate.?limit|too many requests/i.test(errorText)
+        ? "Supabase’s email rate limit has been reached. Wait before requesting another reset email, or configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings."
+        : `Could not request a password reset: ${errorText}`;
+    } finally {
+      button.disabled = false;
+    }
+  });
+  $("#app-theme-select").addEventListener("change", event => applyAppTheme(event.currentTarget.value));
+  $("#admin-dashboard-button").addEventListener("click", showAdminDashboard);
+  $("#dashboard-button").addEventListener("click", showDashboard);
+  $("#admin-refresh-button").addEventListener("click", refreshAdminDashboard);
+  $("#admin-user-search").addEventListener("input", renderAdminUsers);
+  $("#admin-users-prev").addEventListener("click", async () => {
+    if (adminUsersPage === 0) return;
+    adminUsersPage -= 1;
+    await loadAdminUsers();
+  });
+  $("#admin-users-next").addEventListener("click", async () => {
+    if ((adminUsersPage + 1) * ADMIN_PAGE_SIZE >= adminTotalUsers) return;
+    adminUsersPage += 1;
+    await loadAdminUsers();
+  });
+  $("#content-step-back").addEventListener("click", () => setContentWizardStep(contentWizardStep - 1));
+  $("#content-step-next").addEventListener("click", () => {
+    if (contentWizardStep === 4) setActiveTab($("#style-tab"));
+    else setContentWizardStep(contentWizardStep + 1);
   });
   $("#request-access-button").addEventListener("click", async () => {
     const reason = window.prompt("Why do you need additional saved portal and export access?");
@@ -1330,7 +1765,6 @@
     event.preventDefault();
     showDashboard();
   });
-  $("#dashboard-button").addEventListener("click", showDashboard);
   $("#back-button").addEventListener("click", showDashboard);
   $("#top-save-button").addEventListener("click", () => saveCurrentProject());
   $("#editor-save-button").addEventListener("click", () => saveCurrentProject());

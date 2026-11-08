@@ -251,6 +251,91 @@ begin
 end;
 $$;
 
+create or replace function public.get_portal_admin_analytics()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, auth
+as $$
+begin
+  if not public.is_portal_admin() then
+    raise exception 'Administrator access is required.';
+  end if;
+
+  return jsonb_build_object(
+    'total_users', (select count(*) from auth.users),
+    'active_users_30d', (select count(*) from auth.users where last_sign_in_at >= now() - interval '30 days'),
+    'signups_30d', (select count(*) from auth.users where created_at >= now() - interval '30 days'),
+    'saved_templates', (select count(*) from public.portal_drafts),
+    'exports_used', (select coalesce(sum(exports_used), 0) from public.portal_quotas),
+    'pending_requests', (select count(*) from public.portal_access_requests where status = 'pending')
+  );
+end;
+$$;
+
+create or replace function public.list_portal_admin_users(p_limit integer default 50, p_offset integer default 0)
+returns table(
+  account_id uuid,
+  email text,
+  signed_up_at timestamptz,
+  last_sign_in_at timestamptz,
+  templates_saved bigint,
+  exports_used integer,
+  is_admin boolean
+)
+language plpgsql
+stable
+security definer
+set search_path = public, auth
+as $$
+begin
+  if not public.is_portal_admin() then
+    raise exception 'Administrator access is required.';
+  end if;
+
+  return query
+  select u.id, coalesce(u.email, ''), u.created_at, u.last_sign_in_at,
+         count(d.id), coalesce(q.exports_used, 0),
+         exists (select 1 from public.portal_admins a where lower(a.email) = lower(coalesce(u.email, '')))
+  from auth.users u
+  left join public.portal_drafts d on d.user_id = u.id
+  left join public.portal_quotas q on q.user_id = u.id
+  group by u.id, u.email, u.created_at, u.last_sign_in_at, q.exports_used
+  order by u.created_at desc
+  limit greatest(1, least(coalesce(p_limit, 50), 100))
+  offset greatest(coalesce(p_offset, 0), 0);
+end;
+$$;
+
+create or replace function public.remove_portal_user(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  if not public.is_portal_admin() then
+    raise exception 'Administrator access is required.';
+  end if;
+  if p_user_id = auth.uid() then
+    raise exception 'You cannot remove your own administrator account.';
+  end if;
+  if exists (
+    select 1 from public.portal_admins a
+    join auth.users u on lower(u.email) = lower(a.email)
+    where u.id = p_user_id
+  ) then
+    raise exception 'Administrator accounts cannot be removed here.';
+  end if;
+
+  delete from auth.users where id = p_user_id;
+  if not found then
+    raise exception 'The user no longer exists.';
+  end if;
+end;
+$$;
+
 alter table public.portal_admins enable row level security;
 alter table public.portal_quotas enable row level security;
 alter table public.portal_drafts enable row level security;
@@ -295,6 +380,12 @@ grant execute on function public.is_portal_admin() to authenticated;
 grant execute on function public.reserve_portal_export(text) to authenticated;
 grant execute on function public.request_extra_portal_access(text) to authenticated;
 grant execute on function public.review_portal_access_request(uuid, boolean, integer, integer) to authenticated;
+grant execute on function public.get_portal_admin_analytics() to authenticated;
+grant execute on function public.list_portal_admin_users(integer, integer) to authenticated;
+grant execute on function public.remove_portal_user(uuid) to authenticated;
+revoke all on function public.get_portal_admin_analytics() from public, anon;
+revoke all on function public.list_portal_admin_users(integer, integer) from public, anon;
+revoke all on function public.remove_portal_user(uuid) from public, anon;
 
 insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
 values ('portal-images', 'portal-images', false, 5242880, array['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
@@ -304,6 +395,11 @@ drop policy if exists "Users read their portal images" on storage.objects;
 drop policy if exists "Users upload their portal images" on storage.objects;
 drop policy if exists "Users update their portal images" on storage.objects;
 drop policy if exists "Users delete their portal images" on storage.objects;
+drop policy if exists "Admins read portal images" on storage.objects;
+create policy "Admins read portal images" on storage.objects
+for select to authenticated using (
+  bucket_id = 'portal-images' and public.is_portal_admin()
+);
 create policy "Users read their portal images" on storage.objects
 for select to authenticated using (
   bucket_id = 'portal-images' and (storage.foldername(name))[1] = auth.uid()::text
@@ -320,7 +416,11 @@ for update to authenticated using (
 );
 create policy "Users delete their portal images" on storage.objects
 for delete to authenticated using (
-  bucket_id = 'portal-images' and (storage.foldername(name))[1] = auth.uid()::text
+  bucket_id = 'portal-images'
+  and (
+    (storage.foldername(name))[1] = auth.uid()::text
+    or public.is_portal_admin()
+  )
 );
 
 -- Sign in once with this verified email before running this schema.

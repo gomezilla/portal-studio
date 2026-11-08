@@ -20,6 +20,12 @@
       <button class="button button-quiet" id="support-button" type="button">Support</button>
       <button class="button button-quiet" id="sign-in-button" type="button">Sign in</button>
       <button class="button button-quiet" id="sign-out-button" type="button" hidden>Sign out</button>
+      <label class="app-theme-control" for="app-theme-select"><span class="sr-only">App appearance</span>
+        <select id="app-theme-select" aria-label="App appearance">
+          <option value="system">Device</option><option value="light">Light</option><option value="dark">Dark</option>
+        </select>
+      </label>
+      <button class="button button-quiet" id="admin-dashboard-button" type="button" hidden>Admin dashboard</button>
       <button class="button button-quiet" id="dashboard-button" type="button">My portals</button>
       <button class="button button-primary" id="top-save-button" type="button" hidden>Save draft</button>
     </div>
@@ -27,6 +33,7 @@
 
   <main>
     <section class="dashboard page-view" id="dashboard-view">
+      <div class="mobile-advisory"><strong>Using a smaller screen?</strong> Portal Studio works on mobile, but a laptop or desktop is recommended for the easiest editing experience.</div>
       <div class="dashboard-heading">
         <div>
           <p class="eyebrow">YOUR WORKSPACE</p>
@@ -50,10 +57,6 @@
       <div class="account-setup-warning" id="account-setup-warning" hidden>
         Account quotas are not configured. Saving and exporting are disabled until the administrator completes the Supabase setup described in README.
       </div>
-      <section class="admin-requests" id="admin-requests" hidden>
-        <div class="subsection-heading"><h2>Access requests</h2><span id="admin-request-count"></span></div>
-        <div id="admin-request-list"></div>
-      </section>
       <div class="library-heading">
         <div><h2>Saved portals</h2><span id="portal-count" class="count-label">0 drafts</span></div>
         <span class="muted small">Saved privately to your account</span>
@@ -68,7 +71,40 @@
       <p class="privacy-note"><span aria-hidden="true">◈</span> Drafts and gallery uploads are private to your account. Nothing is public.</p>
     </section>
 
+    <section class="admin-dashboard page-view" id="admin-dashboard-view" hidden>
+      <div class="dashboard-heading">
+        <div><p class="eyebrow">ADMINISTRATION</p><h1>Portal Studio overview</h1><p class="muted">Account activity and usage at a glance.</p></div>
+        <button class="button button-quiet" id="admin-refresh-button" type="button">Refresh data</button>
+      </div>
+      <div class="analytics-grid" id="admin-analytics" aria-live="polite">
+        <article class="analytics-card"><span>Registered users</span><strong id="metric-users">—</strong></article>
+        <article class="analytics-card"><span>Active in last 30 days</span><strong id="metric-active">—</strong></article>
+        <article class="analytics-card"><span>Portals saved</span><strong id="metric-templates">—</strong></article>
+        <article class="analytics-card"><span>Exports used</span><strong id="metric-exports">—</strong></article>
+        <article class="analytics-card"><span>Signups in last 30 days</span><strong id="metric-signups">—</strong></article>
+        <article class="analytics-card"><span>Pending access requests</span><strong id="metric-requests">—</strong></article>
+      </div>
+      <section class="admin-users-panel">
+        <div class="library-heading">
+          <div><h2>Users</h2><span class="count-label" id="admin-user-count">Loading…</span></div>
+          <label class="admin-search"><span class="sr-only">Search users by email</span><input id="admin-user-search" type="search" placeholder="Search email"></label>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-users-table">
+            <thead><tr><th>Email</th><th>Templates</th><th>Exports</th><th>Signed up</th><th>Tenure</th><th>Idle</th><th>Action</th></tr></thead>
+            <tbody id="admin-user-rows"><tr><td colspan="7">Loading accounts…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="admin-pagination"><button class="button button-quiet" id="admin-users-prev" type="button">Previous</button><span id="admin-users-page">Page 1</span><button class="button button-quiet" id="admin-users-next" type="button">Next</button></div>
+      </section>
+      <section class="admin-requests" id="admin-requests" hidden>
+        <div class="subsection-heading"><h2>Access requests</h2><span id="admin-request-count"></span></div>
+        <div id="admin-request-list"></div>
+      </section>
+    </section>
+
     <section class="editor page-view" id="editor-view" hidden>
+      <div class="mobile-advisory editor-mobile-advisory"><strong>Best on a larger screen.</strong> You can edit on mobile, but a laptop or desktop gives more room to work.</div>
       <div class="editor-heading">
         <button class="back-button" id="back-button" type="button"><span aria-hidden="true">←</span> All portals</button>
         <div class="editor-title-wrap">
@@ -94,62 +130,93 @@
             <section class="settings-section tab-panel" id="content-panel" role="tabpanel" aria-labelledby="content-tab">
               <div class="section-intro">
                 <span class="step-number">01</span>
-                <div><h2>Make it yours</h2><p>Welcome visitors with your own words.</p></div>
+                <div><h2 id="content-step-title">Portal basics</h2><p id="content-step-description">Start with your portal name and welcome message.</p></div>
               </div>
-              <label class="field">Portal name <input data-field="portalName" maxlength="60" placeholder="Prepaid Wi-Fi Access"></label>
-              <label class="field">Main headline <input data-field="headline" maxlength="80" placeholder="Get connected."></label>
-              <label class="field">Subheading <textarea data-field="subheading" maxlength="150" rows="2" placeholder="Your connection, ready when you are."></textarea></label>
-              <div class="field-row">
-                <label class="field">Image eyebrow <input data-field="captionEyebrow" maxlength="50" placeholder="YOUR LOCAL CONNECTION"></label>
-                <label class="field">Image caption <input data-field="captionTitle" maxlength="60" placeholder="Wi-Fi made simple"></label>
+              <div class="content-wizard-step" data-content-step="0">
+                <label class="field">Portal name <input data-field="portalName" maxlength="60" placeholder="Prepaid Wi-Fi Access"></label>
+                <label class="field">Main headline <input data-field="headline" maxlength="80" placeholder="Get connected."></label>
+                <label class="field">Subheading <textarea data-field="subheading" maxlength="150" rows="2" placeholder="Your connection, ready when you are."></textarea></label>
+                <div class="field-row">
+                  <label class="field">Image eyebrow <input data-field="captionEyebrow" maxlength="50" placeholder="YOUR LOCAL CONNECTION"></label>
+                  <label class="field">Image caption <input data-field="captionTitle" maxlength="60" placeholder="Wi-Fi made simple"></label>
+                </div>
+                <div class="field-toggle">
+                  <div><strong>Portal header</strong><span>Show the title and welcome message</span></div>
+                  <label class="switch"><input type="checkbox" data-field="showHeader" aria-label="Show portal header"><span></span></label>
+                </div>
+                <div class="field-toggle">
+                  <div><strong>Photo gallery</strong><span>Show the rotating image gallery</span></div>
+                  <label class="switch"><input type="checkbox" data-field="showGallery" aria-label="Show photo gallery"><span></span></label>
+                </div>
               </div>
-              <div class="subsection-heading"><h3>Network card labels</h3></div>
-              <label class="field">Speed card heading <input data-field="speedTitle" maxlength="50"></label>
-              <label class="field">Small card label <input data-field="speedEyebrow" maxlength="40"></label>
-              <label class="field">Live test badge <input data-field="speedLiveLabel" maxlength="24"></label>
-              <div class="field-row">
-                <label class="field">Upload label <input data-field="uploadLabel" maxlength="24"></label>
-                <label class="field">Download label <input data-field="downloadLabel" maxlength="24"></label>
+              <div class="content-wizard-step" data-content-step="1" hidden>
+                <div class="subsection-heading"><h3>Speed test card</h3></div>
+                <label class="field">Card heading <input data-field="speedTitle" maxlength="50"></label>
+                <label class="field">Small card label <input data-field="speedEyebrow" maxlength="40"></label>
+                <label class="field">Live test badge <input data-field="speedLiveLabel" maxlength="24"></label>
+                <div class="field-row">
+                  <label class="field">Upload label <input data-field="uploadLabel" maxlength="24"></label>
+                  <label class="field">Download label <input data-field="downloadLabel" maxlength="24"></label>
+                </div>
+                <label class="field">Speed card note <input data-field="speedDisclaimer" maxlength="100"></label>
+                <label class="field">ISP label <input data-field="ispLabel" maxlength="20"></label>
+                <div class="field-toggle">
+                  <div><strong>Show speed test card</strong><span>Show live upload and download speeds</span></div>
+                  <label class="switch"><input type="checkbox" data-field="showSpeedtest" aria-label="Show speed test card"><span></span></label>
+                </div>
+                <div class="preauth-help" id="speedtest-preauth-help">
+                  <strong>Allow speed-test services in Omada</strong>
+                  <p>With Speed test enabled, add both domains to <b>Omada Controller → Portal → Access Control → Pre-authentication Access</b> so guests can run the test before signing in.</p>
+                  <code>speed.cloudflare.com</code><code>ipwho.is</code>
+                  <button class="text-button" id="copy-preauth-domains" type="button">Copy domains</button>
+                </div>
+                <div class="access-method-note"><strong>Access method stays on.</strong> Guests need the access form to connect to your network.</div>
+                <label class="field">Connect button <input data-field="buttonLabel" maxlength="40" placeholder="Connect to Wi-Fi"></label>
               </div>
-              <label class="field">Speed card note <input data-field="speedDisclaimer" maxlength="100"></label>
-              <label class="field">ISP label <input data-field="ispLabel" maxlength="20"></label>
-              <label class="field">Connect button <input data-field="buttonLabel" maxlength="40" placeholder="Connect to Wi-Fi"></label>
-              <label class="field">Footer message <input data-field="footer" maxlength="100" placeholder="Secure access · Simple prepaid plans"></label>
-              <label class="field">Plan table title <input data-field="plansTitle" maxlength="50" placeholder="Plans & pricing"></label>
-              <div class="field-row">
-                <label class="field">First column <input data-field="priceHeading" maxlength="30" placeholder="Price"></label>
-                <label class="field">Second column <input data-field="durationHeading" maxlength="30" placeholder="Duration"></label>
+              <div class="content-wizard-step" data-content-step="2" hidden>
+                <label class="field">Plan table title <input data-field="plansTitle" maxlength="50" placeholder="Plans & pricing"></label>
+                <div class="field-row">
+                  <label class="field">First column <input data-field="priceHeading" maxlength="30" placeholder="Price"></label>
+                  <label class="field">Second column <input data-field="durationHeading" maxlength="30" placeholder="Duration"></label>
+                </div>
+                <div class="field-toggle">
+                  <div><strong>Plans &amp; pricing</strong><span>Show the expandable plan table</span></div>
+                  <label class="switch"><input type="checkbox" data-field="showPlans" aria-label="Show plans and pricing"><span></span></label>
+                </div>
+                <div class="subsection-heading"><h3>Plan rows</h3><button class="text-button" id="add-plan-button" type="button">＋ Add row</button></div>
+                <div id="plan-rows" class="plan-rows"></div>
               </div>
-              <label class="field">Connection guide title <input data-field="guideTitle" maxlength="50" placeholder="How to connect"></label>
-              <label class="field">Guide secondary label <input data-field="guideSecondaryLabel" maxlength="45" placeholder="(Paano kumonekta)"></label>
-              <label class="field">Step 1 <textarea data-field="guideStep1" maxlength="180" rows="2"></textarea></label>
-              <label class="field">Step 2 <textarea data-field="guideStep2" maxlength="180" rows="2"></textarea></label>
-              <label class="field">Step 3 <textarea data-field="guideStep3" maxlength="180" rows="2"></textarea></label>
-              <div class="subsection-heading"><h3>Connection guide images</h3></div>
-              <p class="guide-images-note">The sample instruction images are included by default. Replace them with your own, or remove any step image.</p>
-              <div id="guide-image-slots" class="guide-image-slots"></div>
-              <label class="field">Small note <textarea data-field="note" maxlength="140" rows="2" placeholder="Hourly plans pause automatically when you disconnect."></textarea></label>
-              <div class="field-toggle">
-                <div><strong>Speed test card</strong><span>Show live upload and download speeds</span></div>
-                <label class="switch"><input type="checkbox" data-field="showSpeedtest" aria-label="Show speed test card"><span></span></label>
+              <div class="content-wizard-step" data-content-step="3" hidden>
+                <label class="field">Connection guide title <input data-field="guideTitle" maxlength="50" placeholder="How to connect"></label>
+                <label class="field">Guide secondary label <input data-field="guideSecondaryLabel" maxlength="45" placeholder="(Paano kumonekta)"></label>
+                <label class="field">Step 1 <textarea data-field="guideStep1" maxlength="180" rows="2"></textarea></label>
+                <label class="field">Step 2 <textarea data-field="guideStep2" maxlength="180" rows="2"></textarea></label>
+                <label class="field">Step 3 <textarea data-field="guideStep3" maxlength="180" rows="2"></textarea></label>
+                <div class="subsection-heading"><h3>Connection guide images</h3></div>
+                <p class="guide-images-note">The sample instruction images are included by default. Replace them with your own, or remove any step image.</p>
+                <div id="guide-image-slots" class="guide-image-slots"></div>
+                <div class="field-toggle">
+                  <div><strong>Connection guide</strong><span>Show the expandable instructions</span></div>
+                  <label class="switch"><input type="checkbox" data-field="showGuide" aria-label="Show how-to guide"><span></span></label>
+                </div>
               </div>
-              <div class="preauth-help" id="speedtest-preauth-help">
-                <strong>Allow speed-test services in Omada</strong>
-                <p>With Speed test enabled, add both domains to <b>Omada Controller → Portal → Access Control → Pre-authentication Access</b> so guests can run the test before signing in.</p>
-                <code>speed.cloudflare.com</code>
-                <code>ipwho.is</code>
-                <button class="text-button" id="copy-preauth-domains" type="button">Copy domains</button>
+              <div class="content-wizard-step" data-content-step="4" hidden>
+                <label class="field">Small note <textarea data-field="note" maxlength="140" rows="2" placeholder="Hourly plans pause automatically when you disconnect."></textarea></label>
+                <div class="field-toggle">
+                  <div><strong>Small note</strong><span>Show the note below the portal sections</span></div>
+                  <label class="switch"><input type="checkbox" data-field="showNote" aria-label="Show small note"><span></span></label>
+                </div>
+                <label class="field">Footer message <input data-field="footer" maxlength="100" placeholder="Secure access · Simple prepaid plans"></label>
+                <div class="field-toggle">
+                  <div><strong>Footer message</strong><span>Show your custom footer message</span></div>
+                  <label class="switch"><input type="checkbox" data-field="showFooter" aria-label="Show footer message"><span></span></label>
+                </div>
               </div>
-              <div class="field-toggle">
-                <div><strong>Plans &amp; pricing</strong><span>Show the expandable plan table</span></div>
-                <label class="switch"><input type="checkbox" data-field="showPlans" aria-label="Show plans and pricing"><span></span></label>
+              <div class="content-wizard-navigation">
+                <button class="button button-quiet" id="content-step-back" type="button">Back</button>
+                <span id="content-step-count">Step 1 of 5</span>
+                <button class="button button-primary" id="content-step-next" type="button">Next</button>
               </div>
-              <div class="field-toggle">
-                <div><strong>How-to guide</strong><span>Show connection instructions</span></div>
-                <label class="switch"><input type="checkbox" data-field="showGuide" aria-label="Show how-to guide"><span></span></label>
-              </div>
-              <div class="subsection-heading"><h3>Plan rows</h3><button class="text-button" id="add-plan-button" type="button">＋ Add row</button></div>
-              <div id="plan-rows" class="plan-rows"></div>
             </section>
 
             <section class="settings-section tab-panel" id="style-panel" role="tabpanel" aria-labelledby="style-tab" hidden>
@@ -246,10 +313,13 @@
       <button class="dialog-close" id="auth-close" type="button" aria-label="Close">×</button>
       <p class="eyebrow">PORTAL STUDIO ACCOUNT</p>
       <h2 id="auth-title">Sign in to save your work</h2>
-      <p class="muted">We’ll email you a secure sign-in link. Your saved portals and export allowance follow your account.</p>
+      <p class="muted" id="auth-description">Sign in with your email and password. Your saved portals and export allowance follow your account.</p>
       <label class="field" for="auth-email">Email address<input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
-      <button class="button button-primary" type="submit" id="auth-submit">Email me a sign-in link</button>
+      <label class="field" for="auth-password">Password<input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters"></label>
+      <button class="button button-primary" type="submit" id="auth-submit">Sign in</button>
       <p class="auth-message" id="auth-message" aria-live="polite"></p>
+      <button class="text-button auth-reset" id="auth-reset" type="button">Forgot password?</button>
+      <button class="text-button auth-mode-toggle" id="auth-mode-toggle" type="button">New here? Create an account</button>
     </form>
   </dialog>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
