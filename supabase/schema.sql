@@ -260,7 +260,8 @@ begin
 end;
 $$;
 
-create or replace function public.get_portal_admin_analytics()
+drop function if exists public.get_portal_admin_analytics();
+create function public.get_portal_admin_analytics()
 returns jsonb
 language plpgsql
 stable
@@ -317,7 +318,8 @@ begin
 end;
 $$;
 
-create or replace function public.search_portal_admin_users(
+drop function if exists public.search_portal_admin_users(integer, integer, text, text, text, text, text, text, text);
+create function public.search_portal_admin_users(
   p_limit integer default 50,
   p_offset integer default 0,
   p_search text default null,

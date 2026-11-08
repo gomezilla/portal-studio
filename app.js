@@ -117,6 +117,7 @@
   let adminTotalUsers = 0;
   let adminFilteredTotal = 0;
   let adminFilterTimer = 0;
+  let adminUsersRequestId = 0;
   let localDatabasePromise;
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -274,11 +275,9 @@
   }
 
   async function refreshAdminDashboard() {
-    let analytics;
     try {
-      const { data, error: analyticsError } = await supabaseClient.rpc("get_portal_admin_analytics");
+      const { data: analytics, error: analyticsError } = await supabaseClient.rpc("get_portal_admin_analytics");
       if (analyticsError) throw analyticsError;
-      analytics = data;
       $("#metric-users").textContent = Number(analytics.total_users).toLocaleString();
       $("#metric-active").textContent = Number(analytics.active_users_30d).toLocaleString();
       $("#metric-templates").textContent = Number(analytics.saved_templates).toLocaleString();
@@ -300,6 +299,7 @@
   async function loadAdminUsers() {
     const body = $("#admin-user-rows");
     body.replaceChildren();
+    const requestId = ++adminUsersRequestId;
     const { data, error } = await supabaseClient.rpc("search_portal_admin_users", {
       p_limit: ADMIN_PAGE_SIZE,
       p_offset: adminUsersPage * ADMIN_PAGE_SIZE,
@@ -311,7 +311,11 @@
       p_sort_by: $("#admin-user-sort").value,
       p_sort_direction: $("#admin-user-sort-direction").dataset.direction
     });
-    if (error) throw error;
+    if (error) {
+      if (requestId !== adminUsersRequestId) return;
+      throw error;
+    }
+    if (requestId !== adminUsersRequestId) return;
     if (!data || !Array.isArray(data.users) || !Number.isInteger(Number(data.total_count))) {
       throw new Error("The user-list response has an unexpected format. Run the latest Supabase schema.");
     }
@@ -1160,9 +1164,11 @@
         currentProject.settings.accentColor = preset.accent;
         currentProject.settings.themeMode = preset.mode;
         currentProject.settings.cornerStyle = preset.corners;
+        previewThemeOverride = null;
         renderPresets();
         renderFields();
         syncAccent();
+        setPreviewThemeButton();
         scheduleSave();
         updatePreview();
       });
@@ -1320,19 +1326,20 @@
       base.href = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, "")}template/`;
       doc.head.prepend(base);
       const links = doc.querySelectorAll('link[rel="stylesheet"]');
+      const activeThemeMode = mode === "auto" ? "system" : mode;
       links.forEach(link => {
         if (link.href.endsWith("light.css")) {
           link.href = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, "")}template/light.css`;
-          link.media = "all";
+          link.media = activeThemeMode === "dark" ? "not all" : activeThemeMode === "light" ? "all" : "(prefers-color-scheme: light)";
         } else if (link.href.endsWith("dark.css")) {
           link.href = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, "")}template/dark.css`;
-          link.media = "not all";
+          link.media = activeThemeMode === "light" ? "not all" : activeThemeMode === "dark" ? "all" : "(prefers-color-scheme: dark)";
         }
       });
       const customStyle = doc.createElement("style");
       customStyle.textContent = themeCss(settings, mode);
       doc.head.append(customStyle);
-      doc.documentElement.dataset.theme = mode === "auto" ? "system" : mode;
+      doc.documentElement.dataset.theme = activeThemeMode;
       doc.body.dataset.preview = "true";
       const scripts = doc.querySelectorAll("script");
       scripts.forEach(script => script.remove());
@@ -1369,10 +1376,19 @@
     }
   }
 
+  function getPreviewThemeMode() {
+    return previewThemeOverride || currentProject.settings.themeMode;
+  }
+
+  function isPreviewDark() {
+    const mode = getPreviewThemeMode();
+    return mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+
   function updatePreview() {
     if (!templateHtml || !currentProject) return;
     const doc = new DOMParser().parseFromString(templateHtml, "text/html");
-    applySettingsToDocument(doc, previewThemeOverride || currentProject.settings.themeMode, true);
+    applySettingsToDocument(doc, getPreviewThemeMode(), true);
     previewFrame.srcdoc = `<!doctype html>${doc.documentElement.outerHTML}`;
   }
 
@@ -1385,10 +1401,7 @@
 
   function setPreviewThemeButton() {
     const button = $("#theme-preview-button");
-    const selected = previewThemeOverride || currentProject?.settings.themeMode || "system";
-    const isDark = selected === "dark"
-      || (selected === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    button.innerHTML = isDark
+    button.innerHTML = isPreviewDark()
       ? '<span aria-hidden="true">☾</span> Preview light mode'
       : '<span aria-hidden="true">☼</span> Preview dark mode';
   }
@@ -1669,6 +1682,10 @@
       applyAppTheme(localStorage.getItem("portal-studio-app-theme") || "system");
       window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
         if (document.documentElement.dataset.appTheme === "system") applyAppTheme("system");
+        if (currentProject?.settings.themeMode === "system" && previewThemeOverride === null) {
+          setPreviewThemeButton();
+          updatePreview();
+        }
       });
       setAuthMode("signin");
       const templateResponse = await fetch("template/index.html");
@@ -1861,6 +1878,7 @@
     const button = event.currentTarget;
     button.dataset.direction = button.dataset.direction === "asc" ? "desc" : "asc";
     button.textContent = button.dataset.direction === "asc" ? "Ascending" : "Descending";
+    button.setAttribute("aria-label", `Sort ${button.dataset.direction === "asc" ? "ascending" : "descending"}`);
     reloadFilteredAdminUsers();
   });
   $("#admin-users-prev").addEventListener("click", async () => {
@@ -1869,7 +1887,7 @@
     try {
       await loadAdminUsers();
     } catch (error) {
-      showToast(`Could not load admin users: ${error.message}`, true);
+      showToast(`Could not load users: ${error.message}`, true);
     }
   });
   $("#admin-users-next").addEventListener("click", async () => {
@@ -1878,7 +1896,7 @@
     try {
       await loadAdminUsers();
     } catch (error) {
-      showToast(`Could not load admin users: ${error.message}`, true);
+      showToast(`Could not load users: ${error.message}`, true);
     }
   });
   $("#content-step-back").addEventListener("click", () => setContentWizardStep(contentWizardStep - 1));
@@ -1955,10 +1973,7 @@
     event.currentTarget.value = "";
   });
   $("#theme-preview-button").addEventListener("click", () => {
-    const selected = previewThemeOverride || currentProject.settings.themeMode;
-    const isDark = selected === "dark"
-      || (selected === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    previewThemeOverride = isDark ? "light" : "dark";
+    previewThemeOverride = isPreviewDark() ? "light" : "dark";
     setPreviewThemeButton();
     updatePreview();
   });

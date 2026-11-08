@@ -209,13 +209,13 @@ html[data-color-scheme="dark"] .studio-attribution { color: #777386; }
   .admin-dashboard { width: calc(100% - 32px); padding-top: 30px; }
   .admin-users-panel { padding: 11px; }
   .admin-users-panel .library-heading { align-items: flex-start; }
-  .admin-search input { width: 130px; }
+  .admin-user-controls { width: 100%; flex-wrap: wrap; }
+  .admin-search input { width: 150px; }
+  .admin-user-filter select { max-width: 100%; }
 }
 html[data-color-scheme="dark"] .mobile-advisory { color: #c5c1d0; border-color: #41394e; background: #292632; }
 html[data-color-scheme="dark"] .mobile-advisory strong { color: #d8c8f4; }
 body.editor-active .topbar { display: none; }
-body.editor-active .panel-footer,
-body.editor-active .app-footer { display: none; }
 body.editor-active .editor { height: calc(100vh - 38px); }
 @media(max-width: 900px) {
   body.editor-active .editor { height: auto; min-height: calc(100vh - 38px); }
