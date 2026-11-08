@@ -30,7 +30,7 @@ Create a portal from the dashboard, then edit its content, plan rows, display op
 
 Each of the three connection-guide steps has its own sample image control. Replace a sample with a JPG, PNG, GIF, or WebP up to 5 MB, or remove it to omit that image from the preview and exported ZIP.
 
-The live preview opens in mobile size by default; switch to desktop to inspect the wider layout. Color mode can follow the visitor's device or be fixed to light or dark. The preview-only theme control lets you inspect both modes without changing the saved setting.
+The live preview opens in mobile size by default; switch to desktop to inspect the wider layout. Color mode can follow the visitor's device or be fixed to light or dark, and the preview follows that selected setting. The preview-only theme control lets you inspect the opposite mode without changing the saved setting.
 
 After exporting, Portal Studio shows a dismissible success panel with an optional InstaPay QR contribution. A **Support** button in the header opens the same contribution page anytime. Creating a draft does not interrupt the editor with a donation prompt. The exported portal and Portal Studio include a non-editable “Made by Gomezilla Portal Studio” attribution.
 
@@ -59,7 +59,7 @@ To activate account saving and approvals for a Supabase project:
 3. In **Authentication → URL Configuration**, set the site URL to `https://gomezilla.github.io/portal-studio/` and add it to the redirect URLs.
 4. Configure email confirmation as desired. If the schema or auth setup is incomplete, account saving/export remain unavailable rather than falling back to an insecure client-side quota.
 
-Each approved request grants a regular account one additional saved portal and one additional export. Admin accounts have unlimited saved portals and exports. The administrator can open **Admin dashboard** to view signup dates, account tenure, idle time, saved-portal/export counts, analytics, pending requests, and remove non-admin users. User removal permanently deletes their account, drafts, quota records, requests, and uploaded images. The admin dashboard, unlimited admin quota enforcement, and new SQL RPCs are available only after the current `supabase/schema.sql` has been run. Approval decisions currently appear in the dashboard; the app does not send email notifications for new requests or approval results. The 2 MB ZIP limit is separate from the per-account export allowance.
+Each approved request grants a regular account one additional saved portal and one additional export. Admin accounts have unlimited saved portals and exports. The administrator can open **Admin dashboard** to view signup dates, account tenure, idle time, saved-portal/export counts, analytics, pending requests, and remove non-admin users. The user list can be searched, filtered by role/activity/usage, and sorted across pages. User removal permanently deletes their account, drafts, quota records, requests, and uploaded images. The admin dashboard, unlimited admin quota enforcement, and new SQL RPCs are available only after the current `supabase/schema.sql` has been run. If user-list RPC errors persist, rerun the latest schema so the explicit function return types and filtered user search function are installed. Approval decisions currently appear in the dashboard; the app does not send email notifications for new requests or approval results. The 2 MB ZIP limit is separate from the per-account export allowance.
 
 ## Offline copy
 

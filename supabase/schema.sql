@@ -304,9 +304,9 @@ begin
   end if;
 
   return query
-  select u.id, coalesce(u.email, ''), u.created_at, u.last_sign_in_at,
-         count(d.id), coalesce(q.exports_used, 0),
-         exists (select 1 from public.portal_admins a where lower(a.email) = lower(coalesce(u.email, '')))
+  select u.id::uuid, coalesce(u.email, '')::text, u.created_at::timestamptz, u.last_sign_in_at::timestamptz,
+         count(d.id)::bigint, coalesce(q.exports_used, 0)::integer,
+         exists (select 1 from public.portal_admins a where lower(a.email) = lower(coalesce(u.email, '')))::boolean
   from auth.users u
   left join public.portal_drafts d on d.user_id = u.id
   left join public.portal_quotas q on q.user_id = u.id
@@ -314,6 +314,120 @@ begin
   order by u.created_at desc
   limit greatest(1, least(coalesce(p_limit, 50), 100))
   offset greatest(coalesce(p_offset, 0), 0);
+end;
+$$;
+
+create or replace function public.search_portal_admin_users(
+  p_limit integer default 50,
+  p_offset integer default 0,
+  p_search text default null,
+  p_role text default 'all',
+  p_activity text default 'all',
+  p_templates text default 'all',
+  p_exports text default 'all',
+  p_sort_by text default 'signed_up_at',
+  p_sort_direction text default 'desc'
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, auth
+as $$
+declare
+  result jsonb;
+begin
+  if not public.is_portal_admin() then
+    raise exception 'Administrator access is required.';
+  end if;
+  if coalesce(p_role, 'all') not in ('all', 'admin', 'user')
+     or coalesce(p_activity, 'all') not in ('all', 'active', 'inactive', 'never')
+     or coalesce(p_templates, 'all') not in ('all', 'has', 'none')
+     or coalesce(p_exports, 'all') not in ('all', 'has', 'none')
+     or coalesce(p_sort_by, 'signed_up_at') not in ('email', 'templates_saved', 'exports_used', 'signed_up_at', 'last_sign_in_at')
+     or coalesce(p_sort_direction, 'desc') not in ('asc', 'desc') then
+    raise exception 'Invalid user-list filter or sort option.';
+  end if;
+
+  with admin_users as (
+    select u.id::uuid as account_id,
+           coalesce(u.email, '')::text as email,
+           u.created_at::timestamptz as signed_up_at,
+           u.last_sign_in_at::timestamptz as last_sign_in_at,
+           count(d.id)::bigint as templates_saved,
+           coalesce(q.exports_used, 0)::integer as exports_used,
+           exists (
+             select 1 from public.portal_admins a
+             where lower(a.email) = lower(coalesce(u.email, ''))
+           )::boolean as is_admin
+    from auth.users u
+    left join public.portal_drafts d on d.user_id = u.id
+    left join public.portal_quotas q on q.user_id = u.id
+    group by u.id, u.email, u.created_at, u.last_sign_in_at, q.exports_used
+  ),
+  filtered as (
+    select *
+    from admin_users
+    where (
+        nullif(trim(coalesce(p_search, '')), '') is null
+        or position(lower(trim(p_search)) in lower(email)) > 0
+      )
+      and (
+        coalesce(p_role, 'all') = 'all'
+        or (p_role = 'admin' and is_admin)
+        or (p_role = 'user' and not is_admin)
+      )
+      and (
+        coalesce(p_activity, 'all') = 'all'
+        or (p_activity = 'active' and last_sign_in_at >= now() - interval '30 days')
+        or (p_activity = 'inactive' and last_sign_in_at < now() - interval '30 days')
+        or (p_activity = 'never' and last_sign_in_at is null)
+      )
+      and (
+        coalesce(p_templates, 'all') = 'all'
+        or (p_templates = 'has' and templates_saved > 0)
+        or (p_templates = 'none' and templates_saved = 0)
+      )
+      and (
+        coalesce(p_exports, 'all') = 'all'
+        or (p_exports = 'has' and exports_used > 0)
+        or (p_exports = 'none' and exports_used = 0)
+      )
+  ),
+  ordered as (
+    select filtered.*,
+           row_number() over (
+             order by
+               case when p_sort_by = 'email' and p_sort_direction = 'asc' then lower(email) end asc nulls last,
+               case when p_sort_by = 'email' and p_sort_direction = 'desc' then lower(email) end desc nulls last,
+               case when p_sort_by = 'templates_saved' and p_sort_direction = 'asc' then templates_saved end asc nulls last,
+               case when p_sort_by = 'templates_saved' and p_sort_direction = 'desc' then templates_saved end desc nulls last,
+               case when p_sort_by = 'exports_used' and p_sort_direction = 'asc' then exports_used end asc nulls last,
+               case when p_sort_by = 'exports_used' and p_sort_direction = 'desc' then exports_used end desc nulls last,
+               case when p_sort_by = 'signed_up_at' and p_sort_direction = 'asc' then signed_up_at end asc nulls last,
+               case when p_sort_by = 'signed_up_at' and p_sort_direction = 'desc' then signed_up_at end desc nulls last,
+               case when p_sort_by = 'last_sign_in_at' and p_sort_direction = 'asc' then last_sign_in_at end asc nulls last,
+               case when p_sort_by = 'last_sign_in_at' and p_sort_direction = 'desc' then last_sign_in_at end desc nulls last,
+               account_id
+           ) as page_order
+    from filtered
+  ),
+  paged as (
+    select *
+    from ordered
+    where page_order > greatest(coalesce(p_offset, 0), 0)
+      and page_order <= greatest(coalesce(p_offset, 0), 0) + greatest(1, least(coalesce(p_limit, 50), 100))
+  )
+  select jsonb_build_object(
+    'total_count', (select count(*) from filtered),
+    'users', coalesce(
+      (select jsonb_agg(to_jsonb(page) - 'page_order' order by page.page_order) from paged page),
+      '[]'::jsonb
+    )
+  )
+  into result;
+
+  return result;
 end;
 $$;
 
@@ -391,9 +505,11 @@ grant execute on function public.request_extra_portal_access(text) to authentica
 grant execute on function public.review_portal_access_request(uuid, boolean, integer, integer) to authenticated;
 grant execute on function public.get_portal_admin_analytics() to authenticated;
 grant execute on function public.list_portal_admin_users(integer, integer) to authenticated;
+grant execute on function public.search_portal_admin_users(integer, integer, text, text, text, text, text, text, text) to authenticated;
 grant execute on function public.remove_portal_user(uuid) to authenticated;
 revoke all on function public.get_portal_admin_analytics() from public, anon;
 revoke all on function public.list_portal_admin_users(integer, integer) from public, anon;
+revoke all on function public.search_portal_admin_users(integer, integer, text, text, text, text, text, text, text) from public, anon;
 revoke all on function public.remove_portal_user(uuid) from public, anon;
 
 insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)

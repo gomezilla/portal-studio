@@ -158,7 +158,12 @@ main { flex: 1; }
 .analytics-card strong { color: var(--accent); font-size: 24px; font-variant-numeric: tabular-nums; }
 .admin-users-panel { padding: 16px; border: 1px solid #e9e8ef; border-radius: 13px; background: #fff; }
 .admin-users-panel .library-heading { margin: 0 0 14px; }
-.admin-search input { min-height: 35px; padding: 7px 10px; border: 1px solid #e8e7ed; border-radius: 8px; color: #343448; background: #fff; font-size: 11px; }
+.admin-user-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; margin: 0 0 14px; }
+.admin-search, .admin-user-filter { display: flex; flex-direction: column; gap: 5px; color: #777687; font-size: 9px; font-weight: 650; }
+.admin-search input, .admin-user-filter select { min-height: 35px; padding: 7px 10px; border: 1px solid #e8e7ed; border-radius: 8px; color: #343448; background: #fff; font-size: 11px; }
+.admin-search input { width: 180px; }
+.admin-user-filter select { min-width: 125px; }
+.admin-sort-direction { min-height: 35px; padding: 7px 10px; font-size: 10px; }
 .admin-table-wrap { overflow-x: auto; }
 .admin-users-table { width: 100%; min-width: 860px; border-collapse: collapse; text-align: left; }
 .admin-users-table th, .admin-users-table td { padding: 10px 9px; border-bottom: 1px solid #efeff3; font-size: 10px; white-space: nowrap; }
@@ -185,6 +190,7 @@ html[data-color-scheme="dark"] .template-banner { border-color: #41394e; backgro
 html[data-color-scheme="dark"] .account-setup-warning { color: #e6c18c; border-color: #665234; background: #30281e; }
 html[data-color-scheme="dark"] .account-panel, html[data-color-scheme="dark"] .admin-users-panel, html[data-color-scheme="dark"] .analytics-card { border-color: #393744; }
 html[data-color-scheme="dark"] .admin-search input, html[data-color-scheme="dark"] .field input:not([type=color]), html[data-color-scheme="dark"] .field textarea, html[data-color-scheme="dark"] .field select, html[data-color-scheme="dark"] .plan-row input { color: var(--ink); border-color: #454250; background: #1c1a23; }
+html[data-color-scheme="dark"] .admin-user-filter select { color: var(--ink); border-color: #454250; background: #1c1a23; }
 html[data-color-scheme="dark"] .field, html[data-color-scheme="dark"] .field-label, html[data-color-scheme="dark"] .field-toggle strong, html[data-color-scheme="dark"] .subsection-heading h3, html[data-color-scheme="dark"] .portal-card h3 { color: #d6d2e0; }
 html[data-color-scheme="dark"] .admin-users-table th, html[data-color-scheme="dark"] .admin-users-table td, html[data-color-scheme="dark"] .content-wizard-navigation { border-color: #393744; }
 html[data-color-scheme="dark"] .admin-users-table th, html[data-color-scheme="dark"] .admin-users-table td, html[data-color-scheme="dark"] .admin-pagination, html[data-color-scheme="dark"] .analytics-card span { color: #b6b2c0; }
@@ -208,6 +214,8 @@ html[data-color-scheme="dark"] .studio-attribution { color: #777386; }
 html[data-color-scheme="dark"] .mobile-advisory { color: #c5c1d0; border-color: #41394e; background: #292632; }
 html[data-color-scheme="dark"] .mobile-advisory strong { color: #d8c8f4; }
 body.editor-active .topbar { display: none; }
+body.editor-active .panel-footer,
+body.editor-active .app-footer { display: none; }
 body.editor-active .editor { height: calc(100vh - 38px); }
 @media(max-width: 900px) {
   body.editor-active .editor { height: auto; min-height: calc(100vh - 38px); }

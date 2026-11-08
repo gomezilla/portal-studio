@@ -84,7 +84,15 @@
       <section class="admin-users-panel">
         <div class="library-heading">
           <div><h2>Users</h2><span class="count-label" id="admin-user-count">Loading…</span></div>
-          <label class="admin-search"><span class="sr-only">Search users by email</span><input id="admin-user-search" type="search" placeholder="Search email"></label>
+        </div>
+        <div class="admin-user-controls" aria-label="Filter and sort users">
+          <label class="admin-search"><span>Search email</span><input id="admin-user-search" type="search" placeholder="Search email"></label>
+          <label class="admin-user-filter"><span>Role</span><select id="admin-user-role"><option value="all">All roles</option><option value="admin">Admins</option><option value="user">Users</option></select></label>
+          <label class="admin-user-filter"><span>Activity</span><select id="admin-user-activity"><option value="all">Any activity</option><option value="active">Active in 30 days</option><option value="inactive">Idle 30+ days</option><option value="never">Never signed in</option></select></label>
+          <label class="admin-user-filter"><span>Portals</span><select id="admin-user-templates"><option value="all">Any portal count</option><option value="has">Has saved portals</option><option value="none">No saved portals</option></select></label>
+          <label class="admin-user-filter"><span>Exports</span><select id="admin-user-exports"><option value="all">Any export count</option><option value="has">Has exported</option><option value="none">No exports</option></select></label>
+          <label class="admin-user-filter"><span>Sort by</span><select id="admin-user-sort"><option value="signed_up_at">Signup date</option><option value="email">Email</option><option value="templates_saved">Saved portals</option><option value="exports_used">Exports</option><option value="last_sign_in_at">Last sign-in</option></select></label>
+          <button class="button button-quiet admin-sort-direction" id="admin-user-sort-direction" type="button" data-direction="desc" aria-label="Sort descending">Descending</button>
         </div>
         <div class="admin-table-wrap">
           <table class="admin-users-table">

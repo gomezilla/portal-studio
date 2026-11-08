@@ -106,7 +106,7 @@
   let saveTimer = 0;
   let toastTimer = 0;
   let sizeCheckTimer = 0;
-  let previewDark = false;
+  let previewThemeOverride = null;
   let previewDevice = "mobile";
   let contentWizardStep = 0;
   const templateAssets = new Map();
@@ -115,6 +115,8 @@
   let adminUsersPage = 0;
   let adminUsers = [];
   let adminTotalUsers = 0;
+  let adminFilteredTotal = 0;
+  let adminFilterTimer = 0;
   let localDatabasePromise;
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -272,9 +274,11 @@
   }
 
   async function refreshAdminDashboard() {
+    let analytics;
     try {
-      const { data: analytics, error: analyticsError } = await supabaseClient.rpc("get_portal_admin_analytics");
+      const { data, error: analyticsError } = await supabaseClient.rpc("get_portal_admin_analytics");
       if (analyticsError) throw analyticsError;
+      analytics = data;
       $("#metric-users").textContent = Number(analytics.total_users).toLocaleString();
       $("#metric-active").textContent = Number(analytics.active_users_30d).toLocaleString();
       $("#metric-templates").textContent = Number(analytics.saved_templates).toLocaleString();
@@ -282,21 +286,37 @@
       $("#metric-signups").textContent = Number(analytics.signups_30d).toLocaleString();
       $("#metric-requests").textContent = Number(analytics.pending_requests).toLocaleString();
       adminTotalUsers = Number(analytics.total_users);
-      await loadAdminUsers();
     } catch (error) {
       showToast(`Could not load admin analytics: ${error.message}`, true);
+      return;
+    }
+    try {
+      await loadAdminUsers();
+    } catch (error) {
+      showToast(`Could not load admin users: ${error.message}`, true);
     }
   }
 
   async function loadAdminUsers() {
     const body = $("#admin-user-rows");
     body.replaceChildren();
-    const { data, error } = await supabaseClient.rpc("list_portal_admin_users", {
+    const { data, error } = await supabaseClient.rpc("search_portal_admin_users", {
       p_limit: ADMIN_PAGE_SIZE,
-      p_offset: adminUsersPage * ADMIN_PAGE_SIZE
+      p_offset: adminUsersPage * ADMIN_PAGE_SIZE,
+      p_search: $("#admin-user-search").value.trim(),
+      p_role: $("#admin-user-role").value,
+      p_activity: $("#admin-user-activity").value,
+      p_templates: $("#admin-user-templates").value,
+      p_exports: $("#admin-user-exports").value,
+      p_sort_by: $("#admin-user-sort").value,
+      p_sort_direction: $("#admin-user-sort-direction").dataset.direction
     });
     if (error) throw error;
-    adminUsers = data || [];
+    if (!data || !Array.isArray(data.users) || !Number.isInteger(Number(data.total_count))) {
+      throw new Error("The user-list response has an unexpected format. Run the latest Supabase schema.");
+    }
+    adminUsers = data.users;
+    adminFilteredTotal = Number(data.total_count);
     renderAdminUsers();
   }
 
@@ -311,24 +331,22 @@
 
   function renderAdminUsers() {
     const body = $("#admin-user-rows");
-    const query = $("#admin-user-search").value.trim().toLowerCase();
-    const filtered = adminUsers.filter(user => user.email.toLowerCase().includes(query));
     const start = adminUsers.length ? adminUsersPage * ADMIN_PAGE_SIZE + 1 : 0;
-    const end = Math.min((adminUsersPage + 1) * ADMIN_PAGE_SIZE, adminTotalUsers);
-    $("#admin-user-count").textContent = `${start}–${end} of ${adminTotalUsers}`;
+    const end = Math.min((adminUsersPage + 1) * ADMIN_PAGE_SIZE, adminFilteredTotal);
+    $("#admin-user-count").textContent = `${start}–${end} of ${adminFilteredTotal}`;
     $("#admin-users-page").textContent = `Page ${adminUsersPage + 1}`;
     $("#admin-users-prev").disabled = adminUsersPage === 0;
-    $("#admin-users-next").disabled = end >= adminTotalUsers;
-    if (!filtered.length) {
+    $("#admin-users-next").disabled = end >= adminFilteredTotal;
+    if (!adminUsers.length) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
       cell.colSpan = 7;
-      cell.textContent = query ? "No users on this page match that email." : "No users found.";
+      cell.textContent = "No users match these filters.";
       row.append(cell);
       body.append(row);
       return;
     }
-    filtered.forEach(user => {
+    adminUsers.forEach(user => {
       const row = document.createElement("tr");
       const email = document.createElement("td");
       email.textContent = user.email;
@@ -894,7 +912,7 @@
     renderImageSlots();
     renderGuideImageSlots();
     renderPresets();
-    previewDark = false;
+    previewThemeOverride = null;
     setPreviewThemeButton();
     setDirty(false);
     updatePreview();
@@ -1354,7 +1372,7 @@
   function updatePreview() {
     if (!templateHtml || !currentProject) return;
     const doc = new DOMParser().parseFromString(templateHtml, "text/html");
-    applySettingsToDocument(doc, previewDark ? "dark" : "auto", true);
+    applySettingsToDocument(doc, previewThemeOverride || currentProject.settings.themeMode, true);
     previewFrame.srcdoc = `<!doctype html>${doc.documentElement.outerHTML}`;
   }
 
@@ -1367,7 +1385,12 @@
 
   function setPreviewThemeButton() {
     const button = $("#theme-preview-button");
-    button.innerHTML = previewDark ? '<span aria-hidden="true">☾</span> Preview light mode' : '<span aria-hidden="true">☼</span> Preview dark mode';
+    const selected = previewThemeOverride || currentProject?.settings.themeMode || "system";
+    const isDark = selected === "dark"
+      || (selected === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    button.innerHTML = isDark
+      ? '<span aria-hidden="true">☾</span> Preview light mode'
+      : '<span aria-hidden="true">☼</span> Preview dark mode';
   }
 
   function setPreviewDevice(device) {
@@ -1823,16 +1846,40 @@
   $("#admin-dashboard-button").addEventListener("click", showAdminDashboard);
   $("#dashboard-button").addEventListener("click", showDashboard);
   $("#admin-refresh-button").addEventListener("click", refreshAdminDashboard);
-  $("#admin-user-search").addEventListener("input", renderAdminUsers);
+  const reloadFilteredAdminUsers = () => {
+    adminUsersPage = 0;
+    loadAdminUsers().catch(error => showToast(`Could not load admin users: ${error.message}`, true));
+  };
+  $("#admin-user-search")?.addEventListener("input", () => {
+    window.clearTimeout(adminFilterTimer);
+    adminFilterTimer = window.setTimeout(reloadFilteredAdminUsers, 250);
+  });
+  ["admin-user-role", "admin-user-activity", "admin-user-templates", "admin-user-exports", "admin-user-sort"].forEach(id => {
+    $(`#${id}`)?.addEventListener("change", reloadFilteredAdminUsers);
+  });
+  $("#admin-user-sort-direction")?.addEventListener("click", event => {
+    const button = event.currentTarget;
+    button.dataset.direction = button.dataset.direction === "asc" ? "desc" : "asc";
+    button.textContent = button.dataset.direction === "asc" ? "Ascending" : "Descending";
+    reloadFilteredAdminUsers();
+  });
   $("#admin-users-prev").addEventListener("click", async () => {
     if (adminUsersPage === 0) return;
     adminUsersPage -= 1;
-    await loadAdminUsers();
+    try {
+      await loadAdminUsers();
+    } catch (error) {
+      showToast(`Could not load admin users: ${error.message}`, true);
+    }
   });
   $("#admin-users-next").addEventListener("click", async () => {
-    if ((adminUsersPage + 1) * ADMIN_PAGE_SIZE >= adminTotalUsers) return;
+    if ((adminUsersPage + 1) * ADMIN_PAGE_SIZE >= adminFilteredTotal) return;
     adminUsersPage += 1;
-    await loadAdminUsers();
+    try {
+      await loadAdminUsers();
+    } catch (error) {
+      showToast(`Could not load admin users: ${error.message}`, true);
+    }
   });
   $("#content-step-back").addEventListener("click", () => setContentWizardStep(contentWizardStep - 1));
   $("#content-step-next").addEventListener("click", () => {
@@ -1871,6 +1918,10 @@
     input.addEventListener(input.type === "checkbox" || input.tagName === "SELECT" || input.type === "color" ? "change" : "input", () => {
       const field = input.dataset.field;
       currentProject.settings[field] = input.type === "checkbox" ? input.checked : input.value;
+      if (field === "themeMode") {
+        previewThemeOverride = null;
+        setPreviewThemeButton();
+      }
       if (field === "showSpeedtest") {
         $("#speedtest-preauth-help").hidden = !input.checked;
       }
@@ -1904,7 +1955,10 @@
     event.currentTarget.value = "";
   });
   $("#theme-preview-button").addEventListener("click", () => {
-    previewDark = !previewDark;
+    const selected = previewThemeOverride || currentProject.settings.themeMode;
+    const isDark = selected === "dark"
+      || (selected === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    previewThemeOverride = isDark ? "light" : "dark";
     setPreviewThemeButton();
     updatePreview();
   });
