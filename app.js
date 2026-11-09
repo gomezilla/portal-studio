@@ -85,13 +85,14 @@
     guideStep3: "3. Enter your voucher code and tap Connect to Wi-Fi.",
     showHeader: true,
     showGallery: true,
+    showTerms: true,
     showSpeedtest: true,
     showPlans: true,
     showGuide: true,
     showNote: true,
     showFooter: true,
-    preset: "material",
-    accentColor: "#6750a4",
+    preset: "main",
+    accentColor: "#2359d4",
     themeMode: "system",
     cornerStyle: "soft",
     errorMessages: DEFAULT_ERROR_MESSAGES,
@@ -104,6 +105,7 @@
     ]
   };
   const PRESETS = [
+    { id: "main", name: "Main", light: ["#eaf2fb", "#ffffff", "#f5f8fc", "#e7eff8", "#1c2e3b", "#637b8c", "#d7e3ed"], dark: ["#111b29", "#182536", "#1e2d40", "#26384d", "#e9f1fb", "#a4b4c5", "#34465b"], accent: "#2359d4", hover: "#1948b4", mode: "light", corners: "soft" },
     { id: "material", name: "Material You", light: ["#f3f1fa", "#ffffff", "#f7f5fb", "#eeeaf7", "#262335", "#777386", "#e7e2ef"], dark: ["#171521", "#211e2c", "#272331", "#302b3d", "#f3efff", "#ada7bc", "#3b3548"], accent: "#6750a4", hover: "#55408e", mode: "system", corners: "soft" },
     { id: "facebook", name: "Facebook", light: ["#f0f2f5", "#ffffff", "#f7f8fa", "#e4e6eb", "#1c1e21", "#65676b", "#dadde1"], dark: ["#18191a", "#242526", "#3a3b3c", "#3a3b3c", "#e4e6eb", "#b0b3b8", "#4e4f50"], accent: "#0866ff", hover: "#0756d1", mode: "light", corners: "rounded" },
     { id: "social-media", name: "Social Media", light: ["#f2f4fb", "#ffffff", "#f8f9ff", "#e9eafd", "#24253a", "#74758b", "#dee0ed"], dark: ["#171827", "#222336", "#2c2e43", "#393b54", "#f3f4ff", "#b2b4cf", "#484a64"], accent: "#6557d2", hover: "#5144b8", mode: "system", corners: "rounded" },
@@ -1596,7 +1598,7 @@
       "Customize network status while keeping the access method available.",
       "Set up plan labels and pricing rows.",
       "Write instructions and manage their sample images.",
-      "Add optional notes and a custom footer message."
+      "Add optional notes, a custom footer, and guest terms acceptance."
     ];
     $$("[data-content-step]").forEach(panel => {
       panel.hidden = Number(panel.dataset.contentStep) !== contentWizardStep;
@@ -1922,7 +1924,8 @@
       [".collapsible", settings.showPlans, 0],
       [".collapsible", settings.showGuide, 1],
       [".notes", settings.showNote !== false && Boolean(settings.note)],
-      [".footer-note", settings.showFooter !== false]
+      [".footer-note", settings.showFooter !== false],
+      [".terms-acceptance", settings.showTerms !== false]
     ];
     visibility.forEach(([selector, visible, index]) => {
       const element = index === undefined ? query(selector) : doc.querySelectorAll(selector)[index];
@@ -1970,8 +1973,6 @@
       if (voucher) voucher.style.display = "block";
       const loginButton = query("#button-login");
       if (loginButton) loginButton.type = "button";
-      const hint = query("#oper-hint");
-      if (hint) hint.style.display = "none";
       setText("#speedtest-status", "Live speed testing runs on your deployed Omada portal.");
       const ispOutput = query("#isp-name");
       if (ispOutput) ispOutput.textContent = "Preview";
@@ -1983,6 +1984,17 @@
         document.querySelectorAll(".collapsible").forEach(function(button){button.addEventListener("click",function(){
           var panel=button.nextElementSibling;var open=button.classList.toggle("active");button.setAttribute("aria-expanded",String(open));panel.style.display=open?"block":"none";
         });});
+        function prompt(message,isError){var dialog=document.getElementById("oper-prompt");dialog.dataset.kind=isError?"error":"success";document.getElementById("oper-prompt-title").textContent=isError?"Unable to connect":"Connection notice";document.getElementById("oper-prompt-icon").textContent=isError?"!":"✓";document.getElementById("oper-prompt-message").textContent=message;if(!dialog.open)dialog.showModal();}
+        var terms=document.getElementById("terms-acceptance"),check=document.getElementById("terms-checkbox");
+        function requireTerms(){if(!terms||terms.style.display==="none"||!check||check.checked)return true;prompt("Please agree to the Terms of Service before connecting to Wi-Fi.",true);check.focus();return false;}
+        var login=document.getElementById("button-login");if(login)login.addEventListener("click",function(event){if(!requireTerms())event.preventDefault();});
+        var getCode=document.getElementById("get-code");if(getCode)getCode.addEventListener("click",function(event){if(!requireTerms())event.preventDefault();});
+        document.getElementById("terms-open").addEventListener("click",function(){document.getElementById("terms-dialog").showModal();});
+        document.getElementById("terms-close").addEventListener("click",function(){document.getElementById("terms-dialog").close();});
+        document.getElementById("terms-done").addEventListener("click",function(){document.getElementById("terms-dialog").close();});
+        document.getElementById("terms-dialog").addEventListener("click",function(event){if(event.target===event.currentTarget)event.currentTarget.close();});
+        document.getElementById("oper-prompt-close").addEventListener("click",function(){document.getElementById("oper-prompt").close();});
+        document.getElementById("oper-prompt").addEventListener("click",function(event){if(event.target===event.currentTarget)event.currentTarget.close();});
         var toggle=document.getElementById("togglePassword");if(toggle)toggle.addEventListener("click",function(){var input=document.getElementById("password");var show=input.type==="password";input.type=show?"text":"password";toggle.textContent=show?"Hide":"Show";});
       });`;
       doc.body.append(previewScript);

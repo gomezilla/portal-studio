@@ -144,10 +144,47 @@ Ajax.post(
             countryCode: !!data.sms && data.sms.countryCode || 1
         };
 
+        function showOperPrompt(message, isError) {
+            var dialog = document.getElementById("oper-prompt");
+            if (!dialog || !message) return;
+            dialog.dataset.kind = isError ? "error" : "success";
+            document.getElementById("oper-prompt-title").textContent = isError ? "Unable to connect" : "Connection notice";
+            document.getElementById("oper-prompt-icon").textContent = isError ? "!" : "✓";
+            document.getElementById("oper-prompt-message").textContent = message;
+            if (!dialog.open) dialog.showModal();
+        }
+
+        function requireTermsAcceptance() {
+            var section = document.getElementById("terms-acceptance");
+            var checkbox = document.getElementById("terms-checkbox");
+            if (!section || section.style.display === "none" || !checkbox || checkbox.checked) return true;
+            showOperPrompt("Please agree to the Terms of Service before connecting to Wi-Fi.", true);
+            checkbox.focus();
+            return false;
+        }
+
+        document.getElementById("oper-prompt-close").addEventListener("click", function() {
+            document.getElementById("oper-prompt").close();
+        });
+        document.getElementById("oper-prompt").addEventListener("click", function(event) {
+            if (event.target === event.currentTarget) event.currentTarget.close();
+        });
+        document.getElementById("terms-open").addEventListener("click", function() {
+            document.getElementById("terms-dialog").showModal();
+        });
+        document.getElementById("terms-close").addEventListener("click", function() {
+            document.getElementById("terms-dialog").close();
+        });
+        document.getElementById("terms-done").addEventListener("click", function() {
+            document.getElementById("terms-dialog").close();
+        });
+        document.getElementById("terms-dialog").addEventListener("click", function(event) {
+            if (event.target === event.currentTarget) event.currentTarget.close();
+        });
+
         function pageConfigParse() {
             if (res.errorCode !== 0) {
-                document.getElementById("oper-hint").style.display = "block";
-                document.getElementById("oper-hint").textContent = errorHintMap[res.errorCode];
+                showOperPrompt(errorHintMap[res.errorCode] || "The portal could not load. Please try again.", true);
             }
             document.getElementById("hotspot-section").style.display = "none";
             document.getElementById("input-voucher").style.display = "none";
@@ -188,6 +225,7 @@ Ajax.post(
         }
 
         function handleSubmit() {
+            if (!requireTermsAcceptance()) return;
             var submitData = {};
             submitData['authType'] = window.authType;
             switch (window.authType) {
@@ -245,9 +283,8 @@ Ajax.post(
                             isCommited = true;
                             landingUrl = data.result || landingUrl;
                             window.location.href = landingUrl;
-                            document.getElementById("oper-hint").textContent = errorHintMap[data.errorCode];
                         } else {
-                            document.getElementById("oper-hint").textContent = errorHintMap[data.errorCode];
+                            showOperPrompt(errorHintMap[data.errorCode] || "Authentication failed. Please check your details and try again.", true);
                         }
                     });
                 }
@@ -293,6 +330,7 @@ Ajax.post(
         document.getElementById("button-login").addEventListener("click", handleSubmit);
         document.getElementById("get-code").addEventListener("click", function(e) {
             e.preventDefault();
+            if (!requireTermsAcceptance()) return;
             var phoneNum = document.getElementById("phone-number").value;
 
             function sendSmsAuthCode() {
@@ -308,15 +346,15 @@ Ajax.post(
                     }), function(data) {
                         data = JSON.parse(data);
                         if (data.errorCode !== 0) {
-                            document.getElementById("oper-hint").textContent = errorHintMap[data.errorCode];
+                            showOperPrompt(errorHintMap[data.errorCode] || "Could not send the verification code. Please try again.", true);
                         } else {
-                            document.getElementById("oper-hint").textContent = "SMS has been sent successfully.";
+                            showOperPrompt("SMS has been sent successfully.", false);
                         }
                     }
                 );
             }
             sendSmsAuthCode();
-            document.getElementById("oper-hint").textContent = "Sending Authorization Code...";
+            showOperPrompt("Sending authorization code…", false);
         });
         pageConfigParse();
     }

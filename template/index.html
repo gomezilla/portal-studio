@@ -117,7 +117,12 @@
                                 <input name="radiusSvrIp" id="radiusServerIp" style="display:none">
                             </form>
 
-                            <span id="oper-hint" role="status" style="color: var(--error)"></span>
+                            <div class="terms-acceptance" id="terms-acceptance">
+                                <div class="terms-checkbox">
+                                    <input id="terms-checkbox" type="checkbox">
+                                    <span><label for="terms-checkbox">I agree to the</label> <button id="terms-open" class="terms-link" type="button">Terms of Service</button>.</span>
+                                </div>
+                            </div>
                             <div id="button-area" class="form-group">
                                 <button id="button-login" class="button oper-section-item"><span class="login-button-label">Connect to Wi-Fi</span></button>
                             </div>
@@ -155,6 +160,36 @@
                 </div>
             </div>
         </main>
+        <dialog class="message-dialog" id="oper-prompt" aria-labelledby="oper-prompt-title" aria-describedby="oper-prompt-message">
+            <div class="message-dialog-card">
+                <span class="message-dialog-icon" id="oper-prompt-icon" aria-hidden="true">!</span>
+                <h2 id="oper-prompt-title">Connection notice</h2>
+                <p id="oper-prompt-message"></p>
+                <button class="button message-dialog-close" id="oper-prompt-close" type="button">OK</button>
+            </div>
+        </dialog>
+        <dialog class="terms-dialog" id="terms-dialog" aria-labelledby="terms-title">
+            <div class="terms-dialog-card">
+                <button class="terms-dialog-close" id="terms-close" type="button" aria-label="Close terms">×</button>
+                <p class="terms-eyebrow">PLEASE READ</p>
+                <h2 id="terms-title">Terms of Service</h2>
+                <div class="terms-copy">
+                    <p>By using this Wi-Fi service, you agree to use it only for lawful purposes and to follow the rules below.</p>
+                    <h3>Acceptable use</h3>
+                    <p>Do not use the service to break the law, harm others, access or distribute unlawful content, interfere with networks or devices, send spam, or attempt to bypass security or usage limits. Keep your access credentials private and do not resell or share access unless the provider allows it.</p>
+                    <h3>Service and availability</h3>
+                    <p>Access is provided on an as-available basis. Speed, coverage, session length, and availability may vary. The provider may limit, suspend, or end access to protect the network, comply with law, or address misuse.</p>
+                    <h3>Privacy and security</h3>
+                    <p>Use of the network may be logged and monitored by its operator for security, troubleshooting, and service management, subject to applicable law and the operator's privacy practices. Public Wi-Fi may not be secure; use appropriate protection and avoid sending sensitive information over an untrusted connection.</p>
+                    <h3>Responsibility</h3>
+                    <p>You are responsible for activity from your device and for complying with applicable laws. To the extent allowed by law, the provider is not responsible for interruptions, data loss, or damage arising from use of this service. Nothing in these terms limits rights or remedies that cannot legally be excluded.</p>
+                    <h3>Questions</h3>
+                    <p>Contact the network operator for help or questions about these terms. The operator may update these terms when needed; continued use after an update means you accept the revised terms.</p>
+                    <p class="terms-disclaimer">Sample terms for the network operator to review and adapt to local laws and actual privacy practices. This sample is not legal advice.</p>
+                </div>
+                <button class="button terms-done" id="terms-done" type="button">Done</button>
+            </div>
+        </dialog>
         <script src="tabCollapsible.js"></script>
         <script src="index.js"></script>
         <script src="speedtest.js"></script>
