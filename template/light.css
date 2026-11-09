@@ -311,10 +311,7 @@ td:first-child { font-weight: 700; }
 .terms-dialog-card { position: relative; padding: 26px; }
 .terms-dialog-close { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 50%; color: var(--muted); background: var(--surface-soft); font-size: 22px; cursor: pointer; }
 .terms-eyebrow { margin: 0 0 6px; color: var(--primary); font-size: 10px; font-weight: 750; letter-spacing: .12em; }
-.terms-copy { margin: 16px 0; }
-.terms-copy h3 { margin: 14px 0 4px; font-size: 13px; }
-.terms-copy p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
-.terms-copy .terms-disclaimer { margin-top: 16px; padding: 10px; border-radius: 8px; background: var(--surface-soft); font-size: 10px; }
+.terms-copy { margin: 16px 0; color: var(--muted); font-size: 12px; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
 .terms-done { width: 100%; }
 .footer-note { margin-top: 15px; color: var(--muted); font-size: 10px; text-align: center; }
 .studio-attribution { margin-top: 7px; color: var(--muted); font-size: 9px; text-align: center; }

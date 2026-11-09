@@ -83,9 +83,28 @@
     guideStep1: "1. Open Wi-Fi settings and connect to Prepaid Hotspot or Prepaid Hotspot_2.4G.",
     guideStep2: "2. Select Voucher Access.",
     guideStep3: "3. Enter your voucher code and tap Connect to Wi-Fi.",
+    termsText: `By using this Wi-Fi service, you agree to use it only for lawful purposes and to follow these terms.
+
+ACCEPTABLE USE
+Do not use the service to break the law, harm others, access or distribute unlawful content, interfere with networks or devices, send spam, or attempt to bypass security or usage limits. Keep your access credentials private and do not resell or share access unless the provider allows it.
+
+SERVICE AND AVAILABILITY
+Access is provided on an as-available basis. Speed, coverage, session length, and availability may vary. The provider may limit, suspend, or end access to protect the network, comply with law, or address misuse.
+
+PRIVACY AND SECURITY
+Use of the network may be logged and monitored by its operator for security, troubleshooting, and service management, subject to applicable law and the operator's privacy practices. Public Wi-Fi may not be secure; use appropriate protection and avoid sending sensitive information over an untrusted connection.
+
+RESPONSIBILITY
+You are responsible for activity from your device and for complying with applicable laws. To the extent allowed by law, the provider is not responsible for interruptions, data loss, or damage arising from use of this service. Nothing in these terms limits rights or remedies that cannot legally be excluded.
+
+QUESTIONS
+Contact the network operator for help or questions about these terms. The operator may update these terms when needed; continued use after an update means you accept the revised terms.
+
+SAMPLE TERMS
+Review and adapt these sample terms to the network operator's actual practices and applicable laws. This sample is not legal advice.`,
     showHeader: true,
     showGallery: true,
-    showTerms: true,
+    showTerms: false,
     showSpeedtest: true,
     showPlans: true,
     showGuide: true,
@@ -1872,6 +1891,7 @@
     setText(".login-button-label", settings.buttonLabel);
     setText(".footer-note", settings.footer);
     setText("#note1", settings.note);
+    setText(".terms-copy", settings.termsText);
 
     const collapsibles = doc.querySelectorAll(".collapsible");
     if (collapsibles[0]) collapsibles[0].firstChild.textContent = `${settings.plansTitle} `;
