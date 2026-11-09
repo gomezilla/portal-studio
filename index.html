@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f6fa">
   <title>Portal Studio</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -84,6 +84,7 @@
       <div class="account-panel" id="account-panel" hidden>
         <div><strong id="quota-summary">Sign in to save and export portals.</strong><p id="quota-request-status"></p></div>
         <button class="button button-quiet" id="request-access-button" type="button" hidden>Request more access</button>
+        <button class="button button-quiet" id="unlock-account-button" type="button" hidden>Request account unlock</button>
       </div>
       <div class="account-setup-warning" id="account-setup-warning" hidden>
         Account quotas are not configured. Saving and exporting are disabled until the administrator completes the Supabase setup described in README.
@@ -133,8 +134,8 @@
         </div>
         <div class="admin-table-wrap">
           <table class="admin-users-table">
-            <thead><tr><th>Email</th><th>Templates</th><th>Exports used</th><th>Total allowed exports</th><th>Signed up</th><th>Tenure</th><th>Idle</th><th>Action</th></tr></thead>
-            <tbody id="admin-user-rows"><tr><td colspan="8">Loading accounts…</td></tr></tbody>
+            <thead><tr><th>Email</th><th>Templates</th><th>Exports used</th><th>Total allowed exports</th><th>Signed up</th><th>Last login</th><th>Tenure</th><th>Idle</th><th>Action</th></tr></thead>
+            <tbody id="admin-user-rows"><tr><td colspan="9">Loading accounts…</td></tr></tbody>
           </table>
         </div>
         <div class="admin-pagination"><button class="button button-quiet" id="admin-users-prev" type="button">Previous</button><span id="admin-users-page">Page 1</span><button class="button button-quiet" id="admin-users-next" type="button">Next</button></div>
@@ -142,6 +143,10 @@
       <section class="admin-requests" id="admin-requests" hidden>
         <div class="subsection-heading"><h2>Access requests</h2><span id="admin-request-count"></span></div>
         <div id="admin-request-list"></div>
+      </section>
+      <section class="admin-requests" id="admin-unlock-requests" hidden>
+        <div class="subsection-heading"><h2>Account unlock requests</h2><span id="admin-unlock-request-count"></span></div>
+        <div id="admin-unlock-request-list"></div>
       </section>
       <section class="admin-user-portals" id="admin-user-portals" hidden>
         <div class="subsection-heading">
@@ -155,7 +160,7 @@
         <div class="admin-table-wrap">
           <table class="admin-audit-table">
             <thead><tr><th>Date</th><th>Admin</th><th>User</th><th>Action</th><th>Template credits</th><th>Export credits</th><th>Details</th></tr></thead>
-            <tbody id="admin-audit-rows"><tr><td colspan="6">Loading activity…</td></tr></tbody>
+            <tbody id="admin-audit-rows"><tr><td colspan="7">Loading activity…</td></tr></tbody>
           </table>
         </div>
       </section>
@@ -457,6 +462,18 @@
       <label class="field" for="confirm-account-password">Confirm new password<input id="confirm-account-password" type="password" autocomplete="new-password" minlength="8" required></label>
       <button class="button button-primary" type="submit" id="password-change-submit">Update password</button>
       <p class="auth-message" id="password-change-message" aria-live="polite"></p>
+    </form>
+  </dialog>
+  <dialog class="auth-dialog" id="account-locked-dialog" aria-labelledby="account-locked-title">
+    <form id="account-unlock-form">
+      <button class="dialog-close" id="account-locked-close" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">ACCOUNT ACCESS</p>
+      <h2 id="account-locked-title">This account is locked</h2>
+      <p class="muted" id="account-lock-reason"></p>
+      <p class="muted" id="unlock-request-status"></p>
+      <label class="field" for="unlock-justification">Justification<textarea id="unlock-justification" rows="4" minlength="10" maxlength="1000" required placeholder="Explain why you need account access restored"></textarea></label>
+      <button class="button button-primary" type="submit" id="unlock-request-submit">Send unlock request</button>
+      <p class="auth-message" id="unlock-request-message" aria-live="polite"></p>
     </form>
   </dialog>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

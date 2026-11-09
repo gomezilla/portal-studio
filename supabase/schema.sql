@@ -9,8 +9,18 @@ create table if not exists public.portal_quotas (
   extra_templates integer not null default 0 check (extra_templates >= 0),
   extra_exports integer not null default 0 check (extra_exports >= 0),
   exports_used integer not null default 0 check (exports_used >= 0),
+  is_locked boolean not null default false,
+  lock_reason text,
+  locked_at timestamptz,
+  locked_by text,
   updated_at timestamptz not null default now()
 );
+
+alter table public.portal_quotas
+  add column if not exists is_locked boolean not null default false,
+  add column if not exists lock_reason text,
+  add column if not exists locked_at timestamptz,
+  add column if not exists locked_by text;
 
 create table if not exists public.portal_drafts (
   id text primary key,
@@ -48,15 +58,40 @@ create table if not exists public.portal_access_audit_log (
   admin_email text not null,
   user_id uuid,
   user_email text not null,
-  action text not null check (action in ('request_approved', 'request_denied', 'credits_granted', 'user_removed')),
+  action text not null check (action in (
+    'request_approved', 'request_denied', 'credits_granted', 'user_removed',
+    'account_locked', 'account_unlocked', 'unlock_request_approved', 'unlock_request_denied'
+  )),
   template_credits integer not null default 0 check (template_credits >= 0),
   export_credits integer not null default 0 check (export_credits >= 0),
   details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 
+alter table public.portal_access_audit_log
+  drop constraint if exists portal_access_audit_log_action_check;
+alter table public.portal_access_audit_log
+  add constraint portal_access_audit_log_action_check check (action in (
+    'request_approved', 'request_denied', 'credits_granted', 'user_removed',
+    'account_locked', 'account_unlocked', 'unlock_request_approved', 'unlock_request_denied'
+  ));
+
 create index if not exists portal_access_audit_log_created_at_idx
   on public.portal_access_audit_log(created_at desc);
+
+create table if not exists public.portal_unlock_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  email text not null,
+  reason text not null,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'denied')),
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz,
+  reviewed_by text
+);
+
+create unique index if not exists one_pending_portal_unlock_request_per_user
+  on public.portal_unlock_requests(user_id) where status = 'pending';
 
 create or replace function public.limit_portal_accounts_per_device()
 returns trigger
@@ -82,6 +117,149 @@ begin
     raise exception 'This device has reached its limit of two Portal Studio accounts.';
   end if;
   return new;
+end;
+$$;
+
+create or replace function public.set_portal_user_lock(
+  p_user_id uuid,
+  p_locked boolean,
+  p_reason text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  target_email text;
+begin
+  if not public.is_portal_admin() then
+    raise exception 'Administrator access is required.';
+  end if;
+  if p_user_id = auth.uid() then
+    raise exception 'You cannot lock or unlock your own administrator account.';
+  end if;
+  if exists (
+    select 1 from public.portal_admins a
+    join auth.users u on lower(u.email) = lower(a.email)
+    where u.id = p_user_id
+  ) then
+    raise exception 'Administrator accounts cannot be locked here.';
+  end if;
+  if p_locked and length(trim(coalesce(p_reason, ''))) < 10 then
+    raise exception 'Provide a lock reason of at least 10 characters.';
+  end if;
+
+  select email into target_email from auth.users where id = p_user_id;
+  if not found then
+    raise exception 'The user no longer exists.';
+  end if;
+
+  insert into public.portal_quotas(user_id, is_locked, lock_reason, locked_at, locked_by)
+  values (
+    p_user_id,
+    p_locked,
+    case when p_locked then trim(p_reason) else null end,
+    case when p_locked then now() else null end,
+    case when p_locked then auth.jwt() ->> 'email' else null end
+  )
+  on conflict (user_id) do update
+  set is_locked = excluded.is_locked,
+      lock_reason = excluded.lock_reason,
+      locked_at = excluded.locked_at,
+      locked_by = excluded.locked_by,
+      updated_at = now();
+
+  if not p_locked then
+    update public.portal_unlock_requests
+    set status = 'approved', reviewed_at = now(), reviewed_by = auth.jwt() ->> 'email'
+    where user_id = p_user_id and status = 'pending';
+  end if;
+
+  insert into public.portal_access_audit_log(admin_email, user_id, user_email, action, details)
+  values (
+    coalesce(auth.jwt() ->> 'email', ''),
+    p_user_id,
+    coalesce(target_email, ''),
+    case when p_locked then 'account_locked' else 'account_unlocked' end,
+    case when p_locked then jsonb_build_object('reason', trim(p_reason)) else '{}'::jsonb end
+  );
+end;
+$$;
+
+create or replace function public.request_portal_unlock(p_reason text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  request_id uuid;
+  user_quota public.portal_quotas;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in is required to request an account unlock.';
+  end if;
+  if length(trim(coalesce(p_reason, ''))) < 10 then
+    raise exception 'Please provide a justification of at least 10 characters.';
+  end if;
+  select * into user_quota from public.portal_quotas where user_id = auth.uid() for update;
+  if not found or not user_quota.is_locked then
+    raise exception 'Your account is not locked.';
+  end if;
+  if exists (
+    select 1 from public.portal_unlock_requests where user_id = auth.uid() and status = 'pending'
+  ) then
+    raise exception 'You already have a pending unlock request. Please wait for an administrator to review it.';
+  end if;
+
+  insert into public.portal_unlock_requests(user_id, email, reason)
+  values (auth.uid(), coalesce(auth.jwt() ->> 'email', ''), trim(p_reason))
+  returning id into request_id;
+  return request_id;
+end;
+$$;
+
+create or replace function public.review_portal_unlock_request(p_request_id uuid, p_approve boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  unlock_request public.portal_unlock_requests;
+begin
+  if not public.is_portal_admin() then
+    raise exception 'Administrator access is required.';
+  end if;
+
+  select * into unlock_request
+  from public.portal_unlock_requests
+  where id = p_request_id and status = 'pending'
+  for update;
+  if not found then
+    raise exception 'This unlock request is not pending.';
+  end if;
+
+  if p_approve then
+    update public.portal_quotas
+    set is_locked = false, lock_reason = null, locked_at = null, locked_by = null, updated_at = now()
+    where user_id = unlock_request.user_id;
+  end if;
+
+  update public.portal_unlock_requests
+  set status = case when p_approve then 'approved' else 'denied' end,
+      reviewed_at = now(), reviewed_by = auth.jwt() ->> 'email'
+  where id = p_request_id;
+
+  insert into public.portal_access_audit_log(admin_email, user_id, user_email, action, details)
+  values (
+    coalesce(auth.jwt() ->> 'email', ''),
+    unlock_request.user_id,
+    unlock_request.email,
+    case when p_approve then 'unlock_request_approved' else 'unlock_request_denied' end,
+    jsonb_build_object('reason', unlock_request.reason)
+  );
 end;
 $$;
 
@@ -156,6 +334,10 @@ begin
   where user_id = auth.uid()
   for update;
 
+  if tg_op = 'INSERT' and quota.is_locked then
+    raise exception 'Your account is locked. Submit an unlock request before creating a portal.';
+  end if;
+
   if tg_op = 'UPDATE' then
     if old.user_id <> auth.uid() then
       raise exception 'You can only update your own portal.';
@@ -182,8 +364,9 @@ create trigger portal_draft_limit
 before insert or update on public.portal_drafts
 for each row execute function public.enforce_portal_draft_limit();
 
-create or replace function public.get_my_portal_quota()
-returns table(saved_limit integer, export_limit integer, exports_used integer)
+drop function if exists public.get_my_portal_quota();
+create function public.get_my_portal_quota()
+returns table(saved_limit integer, export_limit integer, exports_used integer, is_locked boolean, lock_reason text)
 language plpgsql
 security definer
 set search_path = public, auth
@@ -193,9 +376,10 @@ declare
 begin
   quota := public.ensure_portal_quota();
   if public.is_portal_admin() then
-    return query select 2147483647, 2147483647, quota.exports_used;
+    return query select 2147483647, 2147483647, quota.exports_used, false, null::text;
   else
-    return query select 1 + quota.extra_templates, 1 + quota.extra_exports, quota.exports_used;
+    return query select 1 + quota.extra_templates, 1 + quota.extra_exports, quota.exports_used,
+      quota.is_locked, quota.lock_reason;
   end if;
 end;
 $$;
@@ -232,6 +416,10 @@ begin
   from public.portal_quotas
   where user_id = auth.uid()
   for update;
+
+  if quota.is_locked then
+    raise exception 'Your account is locked. Submit an unlock request before exporting.';
+  end if;
 
   if not public.is_portal_admin() and quota.exports_used >= 1 + quota.extra_exports then
     raise exception 'You have reached your export limit. Request additional access from the dashboard.';
@@ -495,6 +683,8 @@ begin
              ) then 2147483647
              else (1 + coalesce(q.extra_exports, 0))::integer
            end as exports_allowed,
+           coalesce(q.is_locked, false) as is_locked,
+           coalesce(q.lock_reason, '')::text as lock_reason,
            exists (
              select 1 from public.portal_admins a
              where lower(a.email) = lower(coalesce(u.email, ''))
@@ -502,7 +692,8 @@ begin
     from auth.users u
     left join public.portal_drafts d on d.user_id = u.id
     left join public.portal_quotas q on q.user_id = u.id
-    group by u.id, u.email, u.created_at, u.last_sign_in_at, q.exports_used, q.extra_exports
+    group by u.id, u.email, u.created_at, u.last_sign_in_at, q.exports_used, q.extra_exports,
+             q.is_locked, q.lock_reason
   ),
   filtered as (
     select *
@@ -610,6 +801,7 @@ alter table public.portal_quotas enable row level security;
 alter table public.portal_drafts enable row level security;
 alter table public.portal_access_requests enable row level security;
 alter table public.portal_access_audit_log enable row level security;
+alter table public.portal_unlock_requests enable row level security;
 
 drop policy if exists "Users read own portal quota" on public.portal_quotas;
 create policy "Users read own portal quota" on public.portal_quotas
@@ -636,6 +828,9 @@ drop policy if exists "Admins read access audit log" on public.portal_access_aud
 drop policy if exists "Users read own or admin access audit log" on public.portal_access_audit_log;
 create policy "Users read own or admin access audit log" on public.portal_access_audit_log
 for select to authenticated using (user_id = auth.uid() or public.is_portal_admin());
+drop policy if exists "Users read own or admin unlock requests" on public.portal_unlock_requests;
+create policy "Users read own or admin unlock requests" on public.portal_unlock_requests
+for select to authenticated using (user_id = auth.uid() or public.is_portal_admin());
 drop policy if exists "Admins read all access requests" on public.portal_access_requests;
 drop policy if exists "Users create own access requests" on public.portal_access_requests;
 create policy "Users create own access requests" on public.portal_access_requests
@@ -651,7 +846,11 @@ grant select, insert, update, delete on public.portal_drafts to authenticated;
 grant select on public.portal_quotas to authenticated;
 grant select, insert on public.portal_access_requests to authenticated;
 grant select on public.portal_access_audit_log to authenticated;
+grant select on public.portal_unlock_requests to authenticated;
 grant execute on function public.get_my_portal_quota() to authenticated;
+grant execute on function public.set_portal_user_lock(uuid, boolean, text) to authenticated;
+grant execute on function public.request_portal_unlock(text) to authenticated;
+grant execute on function public.review_portal_unlock_request(uuid, boolean) to authenticated;
 grant execute on function public.is_portal_admin() to authenticated;
 grant execute on function public.reserve_portal_export(text) to authenticated;
 grant execute on function public.request_extra_portal_access(text) to authenticated;
@@ -665,6 +864,9 @@ revoke all on function public.get_portal_admin_analytics() from public, anon;
 revoke all on function public.list_portal_admin_users(integer, integer) from public, anon;
 revoke all on function public.search_portal_admin_users(integer, integer, text, text, text, text, text, text, text) from public, anon;
 revoke all on function public.remove_portal_user(uuid) from public, anon;
+revoke all on function public.set_portal_user_lock(uuid, boolean, text) from public, anon;
+revoke all on function public.request_portal_unlock(text) from public, anon;
+revoke all on function public.review_portal_unlock_request(uuid, boolean) from public, anon;
 
 insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
 values ('portal-images', 'portal-images', false, 1048576, array['image/jpeg', 'image/png', 'image/gif', 'image/webp'])

@@ -130,9 +130,14 @@
   let quota = null;
   let isAdmin = false;
   let pendingRequest = null;
+  let pendingUnlockRequest = null;
   let userRequests = [];
+  let userUnlockRequests = [];
   let creditNotifications = [];
   let adminPendingRequests = [];
+  let adminPendingUnlockRequests = [];
+  let readNotificationUserId = "";
+  let readNotificationIds = new Set();
   let adminViewingUser = null;
   let adminUserProjects = [];
   const remoteDraftIds = new Set();
@@ -381,7 +386,7 @@
     if (!adminUsers.length) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 8;
+      cell.colSpan = 9;
       cell.textContent = "No users match these filters.";
       row.append(cell);
       body.append(row);
@@ -403,7 +408,9 @@
       const exportsAllowed = document.createElement("td");
       exportsAllowed.textContent = user.is_admin ? "Unlimited" : Number(user.exports_allowed).toLocaleString();
       const signedUp = document.createElement("td");
-      signedUp.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(user.signed_up_at));
+      signedUp.textContent = formatDateTime(user.signed_up_at);
+      const lastLogin = document.createElement("td");
+      lastLogin.textContent = user.last_sign_in_at ? formatDateTime(user.last_sign_in_at) : "Never";
       const tenure = document.createElement("td");
       tenure.textContent = durationLabel(user.signed_up_at);
       const idle = document.createElement("td");
@@ -417,6 +424,18 @@
       credits.textContent = "＋ Credits";
       credits.title = "Grant template and export credits";
       credits.addEventListener("click", () => grantUserCredits(user));
+      const lock = document.createElement("button");
+      lock.type = "button";
+      lock.className = "icon-button lock-user-button";
+      lock.innerHTML = user.is_locked
+        ? '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 9.7-1.7M5 10h14v11H5zM12 14v3" /></svg>'
+        : '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5zM12 14v3" /></svg>';
+      lock.setAttribute("aria-label", `${user.is_locked ? "Unlock" : "Lock"} ${user.email}`);
+      lock.title = user.is_locked
+        ? `Unlock account${user.lock_reason ? `: ${user.lock_reason}` : ""}`
+        : "Lock account and require an unlock request";
+      lock.disabled = user.is_admin;
+      lock.addEventListener("click", () => setAdminUserLock(user));
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "icon-button";
@@ -425,9 +444,9 @@
       remove.disabled = user.is_admin;
       remove.title = remove.disabled ? "Administrator accounts cannot be removed here" : "Delete this user and their saved portals";
       remove.addEventListener("click", () => removeAdminUser(user));
-      actions.append(credits, remove);
+      actions.append(credits, lock, remove);
       action.append(actions);
-      row.append(email, templates, exports, exportsAllowed, signedUp, tenure, idle, action);
+      row.append(email, templates, exports, exportsAllowed, signedUp, lastLogin, tenure, idle, action);
       body.append(row);
     });
   }
@@ -749,7 +768,7 @@
     accountEmail.textContent = currentUser?.email || "";
     accountPanel.hidden = OFFLINE_MODE || !configured || Boolean(setupError);
     setupWarning.hidden = OFFLINE_MODE || !setupError;
-    const savedSlotUnavailable = !OFFLINE_MODE && Boolean(currentUser && (!quota || (!isAdmin && projects.length >= quota.saved_limit)));
+    const savedSlotUnavailable = !OFFLINE_MODE && Boolean(currentUser && (!quota || (!isAdmin && !quota.is_locked && projects.length >= quota.saved_limit)));
     $("#create-button").disabled = !OFFLINE_MODE && (!configured || Boolean(setupError) || savedSlotUnavailable);
     $("#empty-create-button").disabled = !OFFLINE_MODE && (!configured || Boolean(setupError) || savedSlotUnavailable);
     $("#admin-dashboard-button").hidden = !isAdmin;
@@ -759,56 +778,122 @@
     if (offlineFolderButton) offlineFolderButton.hidden = !OFFLINE_MODE || !window.showDirectoryPicker;
     $("#quota-summary").textContent = isAdmin
       ? `Administrator access: unlimited saved portals and exports · Saved: ${projects.length} · Exports used: ${quota?.exports_used ?? 0}`
+      : quota?.is_locked
+      ? `Account locked: ${quota.lock_reason || "Contact an administrator for details."}`
       : quota
       ? `Saved portals: ${projects.length} / ${quota.saved_limit} · Exports used: ${quota.exports_used} / ${quota.export_limit}`
       : "Sign in to save and export portals.";
     $("#quota-request-status").textContent = isAdmin
       ? "Administrator accounts are not subject to save or export quotas."
+      : quota?.is_locked
+      ? pendingUnlockRequest
+        ? "Your unlock request is pending administrator review."
+        : "Submit a justification to request that your account be unlocked."
       : pendingRequest
         ? `Your request is ${pendingRequest.status}.`
         : "Each account starts with one saved portal and one export.";
     const requestButton = $("#request-access-button");
-    requestButton.hidden = isAdmin || !currentUser || !quota;
+    requestButton.hidden = isAdmin || !currentUser || !quota || quota.is_locked;
     requestButton.textContent = pendingRequest ? "Request pending" : "Request more access";
+    const unlockButton = $("#unlock-account-button");
+    unlockButton.hidden = isAdmin || !currentUser || !quota?.is_locked;
+    unlockButton.textContent = pendingUnlockRequest ? "Unlock request pending" : "Request account unlock";
     $("#admin-requests").hidden = !isAdmin;
+    $("#admin-unlock-requests").hidden = !isAdmin;
+    renderNotifications();
+  }
+
+  function loadReadNotificationState() {
+    const userId = currentUser?.id || "signed-out";
+    if (userId === readNotificationUserId) return;
+    readNotificationUserId = userId;
+    readNotificationIds = new Set();
+    if (userId === "signed-out") return;
+    try {
+      const saved = window.localStorage.getItem(`portal-studio-read-notifications:${userId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed) || parsed.some(id => typeof id !== "string")) {
+          throw new Error("Saved notification read state has an invalid format.");
+        }
+        readNotificationIds = new Set(parsed);
+      }
+    } catch (error) {
+      showToast(`Could not load notification read status: ${error.message}`, true);
+    }
+  }
+
+  function markNotificationRead(id) {
+    if (!id || readNotificationIds.has(id)) return;
+    readNotificationIds.add(id);
+    try {
+      if (currentUser) {
+        const savedIds = [...readNotificationIds].slice(-300);
+        window.localStorage.setItem(`portal-studio-read-notifications:${currentUser.id}`, JSON.stringify(savedIds));
+        readNotificationIds = new Set(savedIds);
+      }
+    } catch (error) {
+      showToast(`Could not save notification read status: ${error.message}`, true);
+    }
     renderNotifications();
   }
 
   function renderNotifications() {
     const list = $("#notification-list");
     if (!list) return;
+    loadReadNotificationState();
     list.replaceChildren();
     const items = [];
     if (isAdmin) {
       adminPendingRequests.forEach(request => items.push({
+        id: `access:${request.id}:pending`,
         title: `Access request from ${request.email}`,
         message: `${request.requested_templates} template and ${request.requested_exports} export credits requested · ${request.reason}`,
         action: "Review requests"
+      }));
+      adminPendingUnlockRequests.forEach(request => items.push({
+        id: `unlock:${request.id}:pending`,
+        title: `Account unlock request from ${request.email}`,
+        message: request.reason,
+        action: "Review unlock requests"
       }));
     }
     userRequests.forEach(request => {
       if (request.status === "pending") {
         items.push({
+          id: `access:${request.id}:${request.status}:${request.reviewed_at || ""}`,
           title: "Access request pending",
           message: `Your request is waiting for administrator review. Requested: ${request.requested_templates} templates and ${request.requested_exports} exports.`
         });
       } else {
         items.push({
+          id: `access:${request.id}:${request.status}:${request.reviewed_at || ""}`,
           title: `Access request ${request.status}`,
           message: request.status === "approved"
-            ? `Approved: ${request.approved_templates} additional templates and ${request.approved_exports} additional exports.${request.reviewed_by ? ` Reviewed by ${request.reviewed_by}.` : ""}`
-            : `Your request was denied.${request.reviewed_by ? ` Reviewed by ${request.reviewed_by}.` : ""}`
+            ? `Approved: ${request.approved_templates} additional templates and ${request.approved_exports} additional exports. Reviewed by Admin.`
+            : "Your request was denied. Reviewed by Admin."
         });
       }
     });
+    userUnlockRequests.forEach(request => items.push({
+      id: `unlock:${request.id}:${request.status}:${request.reviewed_at || ""}`,
+      title: `Account unlock request ${request.status}`,
+      message: request.status === "pending"
+        ? "Your justification is waiting for administrator review."
+        : request.status === "approved"
+          ? "Your account has been unlocked by Admin."
+          : "Your unlock request was denied by Admin."
+    }));
     creditNotifications.forEach(entry => items.push({
+      id: `credit:${entry.id}`,
       title: "Additional credits granted",
       message: `An administrator added ${entry.template_credits} template and ${entry.export_credits} export credits.`
     }));
     const count = $("#notification-count");
-    count.hidden = items.length === 0;
-    count.textContent = items.length > 9 ? "9+" : String(items.length);
-    $("#notifications-button").setAttribute("aria-label", `Notifications${items.length ? `, ${items.length} updates` : ""}`);
+    const unreadCount = items.filter(item => !readNotificationIds.has(item.id)).length;
+    count.hidden = unreadCount === 0;
+    count.textContent = unreadCount > 9 ? "9+" : String(unreadCount);
+    $("#notifications-button").setAttribute("aria-label", `Notifications${unreadCount ? `, ${unreadCount} unread updates` : ""}`);
     if (!items.length) {
       const empty = document.createElement("p");
       empty.className = "notification-empty";
@@ -818,21 +903,34 @@
     }
     items.forEach(item => {
       const row = document.createElement("article");
-      row.className = "notification-item";
+      const isRead = readNotificationIds.has(item.id);
+      row.className = `notification-item${isRead ? " is-read" : ""}`;
       const title = document.createElement("strong");
       title.textContent = item.title;
       const message = document.createElement("p");
       message.textContent = item.message;
-      row.append(title, message);
+      const messageButton = document.createElement("button");
+      messageButton.type = "button";
+      messageButton.className = "notification-message";
+      messageButton.setAttribute("aria-label", `${isRead ? "Read" : "Mark as read"}: ${item.title}`);
+      messageButton.append(title, message);
+      messageButton.addEventListener("click", () => markNotificationRead(item.id));
+      row.append(messageButton);
       if (item.action) {
         const action = document.createElement("button");
         action.type = "button";
         action.className = "text-button";
         action.textContent = item.action;
-        action.addEventListener("click", () => {
+        action.addEventListener("click", async () => {
+          markNotificationRead(item.id);
           $("#notifications-panel").hidden = true;
           $("#notifications-button").setAttribute("aria-expanded", "false");
-          showAdminDashboard();
+          let target = $("#admin-requests");
+          if (item.action === "Review unlock requests") {
+            target = $("#admin-unlock-requests");
+          }
+          await showAdminDashboard();
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
         });
         row.append(action);
       }
@@ -846,27 +944,40 @@
       return;
     }
     try {
-      const [requestsResult, creditsResult] = await Promise.all([
+      const [requestsResult, creditsResult, unlocksResult] = await Promise.all([
         supabaseClient.from("portal_access_requests")
           .select("id,status,created_at,reviewed_at,reviewed_by,reason,requested_templates,requested_exports,approved_templates,approved_exports")
           .eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(30),
         supabaseClient.from("portal_access_audit_log")
           .select("id,template_credits,export_credits,created_at")
           .eq("user_id", currentUser.id).eq("action", "credits_granted")
-          .order("created_at", { ascending: false }).limit(30)
+          .order("created_at", { ascending: false }).limit(30),
+        supabaseClient.from("portal_unlock_requests")
+          .select("id,status,created_at,reviewed_at,reason")
+          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(30)
       ]);
       const { data: requests, error: requestsError } = requestsResult;
       if (requestsError) throw requestsError;
       if (creditsResult.error) throw creditsResult.error;
+      if (unlocksResult.error) throw unlocksResult.error;
       userRequests = requests || [];
       creditNotifications = creditsResult.data || [];
+      userUnlockRequests = unlocksResult.data || [];
       pendingRequest = userRequests.find(request => request.status === "pending") || null;
+      pendingUnlockRequest = userUnlockRequests.find(request => request.status === "pending") || null;
       if (isAdmin) {
-        const { data: pending, error: pendingError } = await supabaseClient.from("portal_access_requests")
-          .select("id,email,reason,requested_templates,requested_exports,created_at")
-          .eq("status", "pending").order("created_at", { ascending: true });
-        if (pendingError) throw pendingError;
-        adminPendingRequests = pending || [];
+        const [pendingResult, unlocksPendingResult] = await Promise.all([
+          supabaseClient.from("portal_access_requests")
+            .select("id,email,reason,requested_templates,requested_exports,created_at")
+            .eq("status", "pending").order("created_at", { ascending: true }),
+          supabaseClient.from("portal_unlock_requests")
+            .select("id,email,reason,created_at")
+            .eq("status", "pending").order("created_at", { ascending: true })
+        ]);
+        if (pendingResult.error) throw pendingResult.error;
+        if (unlocksPendingResult.error) throw unlocksPendingResult.error;
+        adminPendingRequests = pendingResult.data || [];
+        adminPendingUnlockRequests = unlocksPendingResult.data || [];
       }
       updateAccountControls();
     } catch (error) {
@@ -877,7 +988,7 @@
   async function loadAccountData() {
     if (!currentUser || !supabaseClient) return;
     try {
-      const [draftsResult, quotaResult, adminResult, requestResult, creditsResult] = await Promise.all([
+      const [draftsResult, quotaResult, adminResult, requestResult, creditsResult, unlocksResult] = await Promise.all([
         supabaseClient.from("portal_drafts").select("id,user_id,name,payload,updated_at").eq("user_id", currentUser.id).order("updated_at", { ascending: false }),
         supabaseClient.rpc("get_my_portal_quota"),
         supabaseClient.rpc("is_portal_admin"),
@@ -887,18 +998,24 @@
         supabaseClient.from("portal_access_audit_log")
           .select("id,template_credits,export_credits,created_at")
           .eq("user_id", currentUser.id).eq("action", "credits_granted")
-          .order("created_at", { ascending: false }).limit(30)
+          .order("created_at", { ascending: false }).limit(30),
+        supabaseClient.from("portal_unlock_requests")
+          .select("id,status,created_at,reviewed_at,reason")
+          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(30)
       ]);
       if (draftsResult.error) throw draftsResult.error;
       if (quotaResult.error) throw quotaResult.error;
       if (adminResult.error) throw adminResult.error;
       if (requestResult.error) throw requestResult.error;
       if (creditsResult.error) throw creditsResult.error;
+      if (unlocksResult.error) throw unlocksResult.error;
       quota = quotaResult.data?.[0] || null;
       isAdmin = adminResult.data === true;
       userRequests = requestResult.data || [];
       creditNotifications = creditsResult.data || [];
+      userUnlockRequests = unlocksResult.data || [];
       pendingRequest = userRequests.find(request => request.status === "pending") || null;
+      pendingUnlockRequest = userUnlockRequests.find(request => request.status === "pending") || null;
       remoteDraftIds.clear();
       const loaded = [];
       for (const row of draftsResult.data || []) {
@@ -915,18 +1032,44 @@
       renderNotifications();
       renderDashboard();
       if (isAdmin) {
-        await Promise.all([renderAdminRequests(), refreshAdminDashboard()]);
+        await Promise.all([renderAdminRequests(), renderAdminUnlockRequests(), refreshAdminDashboard()]);
       }
     } catch (error) {
       quota = null;
       window.portalStudioSetupError = `Account storage is not ready: ${error.message}. Run supabase/schema.sql in the Supabase SQL Editor and complete the setup steps in README.`;
       projects = [];
       userRequests = [];
+      userUnlockRequests = [];
       creditNotifications = [];
       pendingRequest = null;
+      pendingUnlockRequest = null;
       renderNotifications();
       renderDashboard();
     }
+  }
+
+  function showAccountLockedDialog() {
+    $("#account-lock-reason").textContent = `Reason: ${quota?.lock_reason || "The administrator has restricted account access."}`;
+    $("#unlock-request-status").textContent = pendingUnlockRequest
+      ? "Your unlock request is pending administrator review."
+      : "You can submit a justification for the administrator to review.";
+    $("#unlock-justification").disabled = Boolean(pendingUnlockRequest);
+    $("#unlock-request-submit").disabled = Boolean(pendingUnlockRequest);
+    $("#unlock-request-message").textContent = "";
+    $("#account-locked-dialog").showModal();
+  }
+
+  async function handleLockedAccountError(error) {
+    if (!/account is locked/i.test(error?.message || "")) return false;
+    try {
+      const { data, error: quotaError } = await supabaseClient.rpc("get_my_portal_quota");
+      if (quotaError) throw quotaError;
+      quota = data?.[0] || { ...quota, is_locked: true };
+      updateAccountControls();
+    } catch (refreshError) {
+      showToast(`Your account is locked, but its reason could not be refreshed: ${refreshError.message}`, true);
+    }
+    return true;
   }
 
   async function hydrateCloudImages(project) {
@@ -1034,6 +1177,84 @@
     $("#admin-requests").hidden = !isAdmin;
   }
 
+  async function renderAdminUnlockRequests() {
+    const list = $("#admin-unlock-request-list");
+    const { data, error } = await supabaseClient.from("portal_unlock_requests")
+      .select("id,email,reason,created_at")
+      .eq("status", "pending").order("created_at", { ascending: true });
+    if (error) {
+      showToast(`Could not load account unlock requests: ${error.message}`, true);
+      return;
+    }
+    adminPendingUnlockRequests = data || [];
+    renderNotifications();
+    $("#admin-unlock-request-count").textContent = `${adminPendingUnlockRequests.length} pending`;
+    list.replaceChildren();
+    adminPendingUnlockRequests.forEach(request => {
+      const row = document.createElement("article");
+      row.className = "admin-request";
+      const text = document.createElement("div");
+      const email = document.createElement("strong");
+      email.textContent = request.email;
+      const reason = document.createElement("p");
+      reason.textContent = request.reason;
+      text.append(email, reason);
+      const actions = document.createElement("div");
+      actions.className = "admin-request-actions";
+      [["Unlock", true], ["Deny", false]].forEach(([label, approved]) => {
+        const button = document.createElement("button");
+        button.textContent = label;
+        if (approved) button.className = "approve";
+        button.addEventListener("click", () => reviewUnlockRequest(request.id, approved));
+        actions.append(button);
+      });
+      row.append(text, actions);
+      list.append(row);
+    });
+    $("#admin-unlock-requests").hidden = !isAdmin;
+  }
+
+  async function setAdminUserLock(user) {
+    let reason = null;
+    if (user.is_locked) {
+      if (!window.confirm(`Unlock the account for ${user.email}?`)) return;
+    } else {
+      reason = window.prompt(`Why are you locking ${user.email}? (At least 10 characters)`);
+      if (reason === null) return;
+      reason = reason.trim();
+      if (reason.length < 10) {
+        showToast("Provide a lock reason of at least 10 characters.", true);
+        return;
+      }
+    }
+    try {
+      const { error } = await supabaseClient.rpc("set_portal_user_lock", {
+        p_user_id: user.account_id,
+        p_locked: !user.is_locked,
+        p_reason: reason
+      });
+      if (error) throw error;
+      showToast(user.is_locked ? "Account unlocked." : "Account locked.");
+      await loadAccountData();
+    } catch (error) {
+      showToast(`Could not ${user.is_locked ? "unlock" : "lock"} account: ${error.message}`, true);
+    }
+  }
+
+  async function reviewUnlockRequest(id, approved) {
+    try {
+      const { error } = await supabaseClient.rpc("review_portal_unlock_request", {
+        p_request_id: id,
+        p_approve: approved
+      });
+      if (error) throw error;
+      showToast(approved ? "Account unlocked." : "Unlock request denied.");
+      await loadAccountData();
+    } catch (error) {
+      showToast(`Could not review unlock request: ${error.message}`, true);
+    }
+  }
+
   async function loadAdminAuditLog() {
     const body = $("#admin-audit-rows");
     if (!body || !isAdmin) return;
@@ -1058,7 +1279,11 @@
       request_approved: "Request approved",
       request_denied: "Request denied",
       credits_granted: "Credits granted",
-      user_removed: "User deleted"
+      user_removed: "User deleted",
+      account_locked: "Account locked",
+      account_unlocked: "Account unlocked",
+      unlock_request_approved: "Unlock request approved",
+      unlock_request_denied: "Unlock request denied"
     };
     data.forEach(entry => {
       const row = document.createElement("tr");
@@ -1118,6 +1343,12 @@
     return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
   }
 
+  function formatDateTime(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  }
+
   function normalizeProject(project) {
     const defaultSettings = JSON.parse(JSON.stringify(DEFAULTS));
     const settings = { ...defaultSettings, ...(project.settings || {}) };
@@ -1171,6 +1402,10 @@
       showToast("Your account quota is still loading. Please try again.", true);
       return;
     }
+    if (!isAdmin && quota.is_locked) {
+      showAccountLockedDialog();
+      return;
+    }
     if (!isAdmin && projects.length >= quota.saved_limit) {
       showToast("You have reached your saved portal limit. Request additional access from the dashboard.", true);
       return;
@@ -1183,11 +1418,16 @@
       openEditor();
     } catch (error) {
       currentProject = null;
-      showToast(`Could not create a draft: ${error.message}`, true);
+      if (await handleLockedAccountError(error)) showAccountLockedDialog();
+      else showToast(`Could not create a draft: ${error.message}`, true);
     }
   }
 
   async function duplicateProject(project) {
+    if (!OFFLINE_MODE && !isAdmin && quota?.is_locked) {
+      showAccountLockedDialog();
+      return;
+    }
     if (!OFFLINE_MODE && (!quota || (!isAdmin && projects.length >= quota.saved_limit))) {
       showToast("You have reached your saved portal limit. Request additional access from the dashboard.", true);
       return;
@@ -1204,7 +1444,8 @@
       renderDashboard();
       showToast("Portal duplicated.");
     } catch (error) {
-      showToast(`Could not duplicate this portal: ${error.message}`, true);
+      if (await handleLockedAccountError(error)) showAccountLockedDialog();
+      else showToast(`Could not duplicate this portal: ${error.message}`, true);
     }
   }
 
@@ -1294,7 +1535,7 @@
     $("#admin-user-portals").hidden = true;
     $("#top-save-button").hidden = true;
     await refreshAdminDashboard();
-    await renderAdminRequests();
+    await Promise.all([renderAdminRequests(), renderAdminUnlockRequests()]);
     window.scrollTo(0, 0);
   }
 
@@ -1900,6 +2141,10 @@
         bar.classList.add("error");
         status.textContent = `ZIP is ${formatBytes(size)}; it must be under 2 MB. Remove gallery images or replace large images with smaller, optimized files.`;
         button.disabled = true;
+      } else if (!OFFLINE_MODE && !isAdmin && quota?.is_locked) {
+        bar.classList.add("warning");
+        status.textContent = "Your account is locked. Choose Export ZIP to review the reason and request an unlock.";
+        button.disabled = false;
       } else if (!OFFLINE_MODE && !isAdmin && quota && quota.exports_used >= quota.export_limit) {
         bar.classList.add("warning");
         status.textContent = `ZIP size: ${formatBytes(size)}. Your ${quota.export_limit} export allowance has been used; request additional access from the dashboard.`;
@@ -1920,6 +2165,10 @@
     if (!currentProject || !templateHtml) return;
     if (!OFFLINE_MODE && (!currentUser || !quota)) {
       showToast("Sign in and load your account quota before exporting.", true);
+      return;
+    }
+    if (!OFFLINE_MODE && !isAdmin && quota.is_locked) {
+      showAccountLockedDialog();
       return;
     }
     if (!OFFLINE_MODE && !isAdmin && quota.exports_used >= quota.export_limit) {
@@ -1965,7 +2214,8 @@
       }
       showThankYou("exported");
     } catch (error) {
-      showToast(`Could not export portal: ${error.message}`, true);
+      if (await handleLockedAccountError(error)) showAccountLockedDialog();
+      else showToast(`Could not export portal: ${error.message}`, true);
     } finally {
       button.innerHTML = '<span aria-hidden="true">↓</span> Export ZIP';
       queueExportSizeCheck();
@@ -2102,6 +2352,16 @@
         if (event === "SIGNED_IN") {
           window.setTimeout(async () => {
             currentUser = session?.user || null;
+            userRequests = [];
+            userUnlockRequests = [];
+            creditNotifications = [];
+            adminPendingRequests = [];
+            adminPendingUnlockRequests = [];
+            quota = null;
+            isAdmin = false;
+            pendingRequest = null;
+            pendingUnlockRequest = null;
+            renderNotifications();
             if ($("#auth-form").dataset.mode !== "recovery") $("#auth-dialog").close();
             await loadAccountData();
             if (pendingCreateAfterSignIn) {
@@ -2113,14 +2373,19 @@
           currentUser = null;
           projects = [];
           userRequests = [];
+          userUnlockRequests = [];
           creditNotifications = [];
           adminPendingRequests = [];
+          adminPendingUnlockRequests = [];
           adminViewingUser = null;
           adminUserProjects = [];
           currentProject = null;
           quota = null;
           isAdmin = false;
           pendingRequest = null;
+          pendingUnlockRequest = null;
+          readNotificationUserId = "";
+          readNotificationIds = new Set();
           remoteDraftIds.clear();
           editorView.hidden = true;
           dashboardView.hidden = false;
@@ -2389,6 +2654,36 @@
     }
     showToast("Your request has been sent to the administrator.");
     await loadAccountData();
+  });
+  $("#unlock-account-button").addEventListener("click", showAccountLockedDialog);
+  $("#account-locked-close").addEventListener("click", () => $("#account-locked-dialog").close());
+  $("#account-unlock-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const message = $("#unlock-request-message");
+    const button = $("#unlock-request-submit");
+    const reason = $("#unlock-justification").value.trim();
+    if (reason.length < 10) {
+      message.textContent = "Please provide a justification of at least 10 characters.";
+      return;
+    }
+    if (!currentUser || !supabaseClient) {
+      message.textContent = "Sign in again before requesting an account unlock.";
+      return;
+    }
+    button.disabled = true;
+    message.textContent = "Sending your request…";
+    try {
+      const { error } = await supabaseClient.rpc("request_portal_unlock", { p_reason: reason });
+      if (error) throw error;
+      $("#account-locked-dialog").close();
+      $("#account-unlock-form").reset();
+      await loadAccountData();
+      showToast("Your unlock request was sent to the administrator.");
+    } catch (error) {
+      message.textContent = `Could not send unlock request: ${error.message}`;
+    } finally {
+      button.disabled = Boolean(pendingUnlockRequest);
+    }
   });
 
   $("#create-button").addEventListener("click", createProject);

@@ -277,12 +277,18 @@ body.editor-active .editor { height: calc(100vh - 38px); }
 .notification-heading .icon-button { width: 27px; height: 27px; }
 .notification-item { padding: 11px 14px; border-bottom: 1px solid #efeff3; }
 .notification-item:last-child { border-bottom: 0; }
+.notification-message { position: relative; width: 100%; padding: 0 0 0 12px; border: 0; color: inherit; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.notification-message:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.notification-message::before { position: absolute; top: 4px; left: 0; width: 6px; height: 6px; border-radius: 50%; background: #dc5366; content: ""; }
+.notification-item.is-read .notification-message::before { background: transparent; }
+.notification-item.is-read .notification-message { opacity: .68; }
 .notification-item strong { display: block; color: #454356; font-size: 11px; }
 .notification-item p { margin: 4px 0 0; color: #818092; font-size: 10px; line-height: 1.5; }
 .notification-empty { margin: 0; padding: 18px 14px; color: #818092; font-size: 11px; }
 .admin-email-link { padding: 0; border: 0; color: var(--accent); background: transparent; text-align: left; font-size: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .admin-action-buttons { display: flex; align-items: center; gap: 6px; }
 .admin-action-buttons .icon-button { width: 29px; height: 29px; color: #b94d5a; }
+.admin-action-buttons .lock-user-button { color: #6b5b95; }
 .admin-action-buttons .icon-button:disabled { opacity: .4; }
 .admin-action-buttons .icon-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
 .admin-action-buttons .credit-button { padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; color: #56566b; background: #fff; font-size: 9px; }
