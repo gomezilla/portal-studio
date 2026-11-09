@@ -35,8 +35,60 @@ create table if not exists public.portal_access_requests (
   reviewed_by text
 );
 
+alter table public.portal_access_requests
+  add column if not exists approved_templates integer not null default 0 check (approved_templates >= 0),
+  add column if not exists approved_exports integer not null default 0 check (approved_exports >= 0);
+
 create unique index if not exists one_pending_portal_request_per_user
   on public.portal_access_requests(user_id) where status = 'pending';
+
+create table if not exists public.portal_access_audit_log (
+  id bigint generated always as identity primary key,
+  request_id uuid,
+  admin_email text not null,
+  user_id uuid,
+  user_email text not null,
+  action text not null check (action in ('request_approved', 'request_denied', 'credits_granted', 'user_removed')),
+  template_credits integer not null default 0 check (template_credits >= 0),
+  export_credits integer not null default 0 check (export_credits >= 0),
+  details jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists portal_access_audit_log_created_at_idx
+  on public.portal_access_audit_log(created_at desc);
+
+create or replace function public.limit_portal_accounts_per_device()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  device_id text;
+  device_accounts integer;
+begin
+  device_id := nullif(trim(new.raw_user_meta_data ->> 'portal_device_id'), '');
+  if device_id is null or length(device_id) < 32 or length(device_id) > 128 then
+    raise exception 'A valid device registration is required to create an account.';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended(device_id, 0));
+  select count(*) into device_accounts
+  from auth.users
+  where raw_user_meta_data ->> 'portal_device_id' = device_id;
+
+  if device_accounts >= 2 then
+    raise exception 'This device has reached its limit of two Portal Studio accounts.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists portal_account_device_limit on auth.users;
+create trigger portal_account_device_limit
+before insert on auth.users
+for each row execute function public.limit_portal_accounts_per_device();
 
 create or replace function public.is_portal_admin()
 returns boolean
@@ -86,13 +138,13 @@ declare
   quota public.portal_quotas;
   saved_count integer;
 begin
-  if auth.uid() is null or new.user_id <> auth.uid() then
-    raise exception 'You can only save your own portal.';
-  end if;
-
   if public.is_portal_admin() then
     new.updated_at = now();
     return new;
+  end if;
+
+  if auth.uid() is null or new.user_id <> auth.uid() then
+    raise exception 'You can only save your own portal.';
   end if;
 
   insert into public.portal_quotas(user_id)
@@ -162,9 +214,14 @@ begin
   end if;
 
   perform 1 from public.portal_drafts
-  where id = p_draft_id and user_id = auth.uid();
+  where id = p_draft_id
+    and (user_id = auth.uid() or public.is_portal_admin());
   if not found then
     raise exception 'Save this portal before exporting.';
+  end if;
+
+  if public.is_portal_admin() then
+    return 0;
   end if;
 
   insert into public.portal_quotas(user_id)
@@ -204,6 +261,13 @@ begin
     raise exception 'Please explain why you need additional access (at least 10 characters).';
   end if;
 
+  if exists (
+    select 1 from public.portal_access_requests
+    where user_id = auth.uid() and status = 'pending'
+  ) then
+    raise exception 'You already have a pending access request. Please wait for an administrator to review it.';
+  end if;
+
   insert into public.portal_access_requests(user_id, email, reason)
   values (auth.uid(), coalesce(auth.jwt() ->> 'email', ''), trim(p_reason))
   returning id into request_id;
@@ -228,8 +292,12 @@ begin
   if not public.is_portal_admin() then
     raise exception 'Administrator access is required.';
   end if;
-  if p_extra_templates < 0 or p_extra_templates > 10 or p_extra_exports < 0 or p_extra_exports > 10 then
+  if p_extra_templates is null or p_extra_templates < 0 or p_extra_templates > 10
+     or p_extra_exports is null or p_extra_exports < 0 or p_extra_exports > 10 then
     raise exception 'Grant values must be between 0 and 10.';
+  end if;
+  if p_approve and p_extra_templates = 0 and p_extra_exports = 0 then
+    raise exception 'Approve at least one template or export credit.';
   end if;
 
   select * into access_request
@@ -255,8 +323,70 @@ begin
   update public.portal_access_requests
   set status = case when p_approve then 'approved' else 'denied' end,
       reviewed_at = now(),
-      reviewed_by = auth.jwt() ->> 'email'
+      reviewed_by = auth.jwt() ->> 'email',
+      approved_templates = case when p_approve then p_extra_templates else 0 end,
+      approved_exports = case when p_approve then p_extra_exports else 0 end
   where id = p_request_id;
+
+  insert into public.portal_access_audit_log(
+    request_id, admin_email, user_id, user_email, action, template_credits, export_credits, details
+  )
+  values (
+    access_request.id,
+    coalesce(auth.jwt() ->> 'email', ''),
+    access_request.user_id,
+    access_request.email,
+    case when p_approve then 'request_approved' else 'request_denied' end,
+    case when p_approve then p_extra_templates else 0 end,
+    case when p_approve then p_extra_exports else 0 end,
+    jsonb_build_object('reason', access_request.reason)
+  );
+end;
+$$;
+
+create or replace function public.grant_portal_credits(
+  p_user_id uuid,
+  p_extra_templates integer,
+  p_extra_exports integer
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  target_email text;
+begin
+  if not public.is_portal_admin() then
+    raise exception 'Administrator access is required.';
+  end if;
+  if p_extra_templates is null or p_extra_templates < 0 or p_extra_templates > 1000
+     or p_extra_exports is null or p_extra_exports < 0 or p_extra_exports > 1000 then
+    raise exception 'Credit values must be between 0 and 1000.';
+  end if;
+  if p_extra_templates = 0 and p_extra_exports = 0 then
+    raise exception 'Grant at least one template or export credit.';
+  end if;
+
+  select email into target_email from auth.users where id = p_user_id;
+  if not found then
+    raise exception 'The user no longer exists.';
+  end if;
+
+  insert into public.portal_quotas(user_id, extra_templates, extra_exports)
+  values (p_user_id, p_extra_templates, p_extra_exports)
+  on conflict (user_id) do update
+  set extra_templates = public.portal_quotas.extra_templates + excluded.extra_templates,
+      extra_exports = public.portal_quotas.extra_exports + excluded.extra_exports,
+      updated_at = now();
+
+  insert into public.portal_access_audit_log(
+    admin_email, user_id, user_email, action, template_credits, export_credits
+  )
+  values (
+    coalesce(auth.jwt() ->> 'email', ''), p_user_id, coalesce(target_email, ''),
+    'credits_granted', p_extra_templates, p_extra_exports
+  );
 end;
 $$;
 
@@ -358,6 +488,13 @@ begin
            u.last_sign_in_at::timestamptz as last_sign_in_at,
            count(d.id)::bigint as templates_saved,
            coalesce(q.exports_used, 0)::integer as exports_used,
+           case
+             when exists (
+               select 1 from public.portal_admins a
+               where lower(a.email) = lower(coalesce(u.email, ''))
+             ) then 2147483647
+             else (1 + coalesce(q.extra_exports, 0))::integer
+           end as exports_allowed,
            exists (
              select 1 from public.portal_admins a
              where lower(a.email) = lower(coalesce(u.email, ''))
@@ -365,7 +502,7 @@ begin
     from auth.users u
     left join public.portal_drafts d on d.user_id = u.id
     left join public.portal_quotas q on q.user_id = u.id
-    group by u.id, u.email, u.created_at, u.last_sign_in_at, q.exports_used
+    group by u.id, u.email, u.created_at, u.last_sign_in_at, q.exports_used, q.extra_exports
   ),
   filtered as (
     select *
@@ -439,6 +576,8 @@ language plpgsql
 security definer
 set search_path = public, auth
 as $$
+declare
+  target_email text;
 begin
   if not public.is_portal_admin() then
     raise exception 'Administrator access is required.';
@@ -454,10 +593,15 @@ begin
     raise exception 'Administrator accounts cannot be removed here.';
   end if;
 
-  delete from auth.users where id = p_user_id;
+  select email into target_email from auth.users where id = p_user_id;
   if not found then
     raise exception 'The user no longer exists.';
   end if;
+
+  insert into public.portal_access_audit_log(admin_email, user_id, user_email, action)
+  values (coalesce(auth.jwt() ->> 'email', ''), p_user_id, coalesce(target_email, ''), 'user_removed');
+
+  delete from auth.users where id = p_user_id;
 end;
 $$;
 
@@ -465,6 +609,7 @@ alter table public.portal_admins enable row level security;
 alter table public.portal_quotas enable row level security;
 alter table public.portal_drafts enable row level security;
 alter table public.portal_access_requests enable row level security;
+alter table public.portal_access_audit_log enable row level security;
 
 drop policy if exists "Users read own portal quota" on public.portal_quotas;
 create policy "Users read own portal quota" on public.portal_quotas
@@ -475,16 +620,21 @@ drop policy if exists "Users insert own drafts" on public.portal_drafts;
 drop policy if exists "Users update own drafts" on public.portal_drafts;
 drop policy if exists "Users delete own drafts" on public.portal_drafts;
 create policy "Users read own drafts" on public.portal_drafts
-for select to authenticated using (user_id = auth.uid());
+for select to authenticated using (user_id = auth.uid() or public.is_portal_admin());
 create policy "Users insert own drafts" on public.portal_drafts
 for insert to authenticated with check (user_id = auth.uid());
 create policy "Users update own drafts" on public.portal_drafts
-for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+for update to authenticated using (user_id = auth.uid() or public.is_portal_admin())
+with check (user_id = auth.uid() or public.is_portal_admin());
 create policy "Users delete own drafts" on public.portal_drafts
 for delete to authenticated using (user_id = auth.uid());
 
 drop policy if exists "Users read own access requests" on public.portal_access_requests;
 create policy "Users read own access requests" on public.portal_access_requests
+for select to authenticated using (user_id = auth.uid() or public.is_portal_admin());
+drop policy if exists "Admins read access audit log" on public.portal_access_audit_log;
+drop policy if exists "Users read own or admin access audit log" on public.portal_access_audit_log;
+create policy "Users read own or admin access audit log" on public.portal_access_audit_log
 for select to authenticated using (user_id = auth.uid() or public.is_portal_admin());
 drop policy if exists "Admins read all access requests" on public.portal_access_requests;
 drop policy if exists "Users create own access requests" on public.portal_access_requests;
@@ -500,11 +650,13 @@ for insert to authenticated with check (
 grant select, insert, update, delete on public.portal_drafts to authenticated;
 grant select on public.portal_quotas to authenticated;
 grant select, insert on public.portal_access_requests to authenticated;
+grant select on public.portal_access_audit_log to authenticated;
 grant execute on function public.get_my_portal_quota() to authenticated;
 grant execute on function public.is_portal_admin() to authenticated;
 grant execute on function public.reserve_portal_export(text) to authenticated;
 grant execute on function public.request_extra_portal_access(text) to authenticated;
 grant execute on function public.review_portal_access_request(uuid, boolean, integer, integer) to authenticated;
+grant execute on function public.grant_portal_credits(uuid, integer, integer) to authenticated;
 grant execute on function public.get_portal_admin_analytics() to authenticated;
 grant execute on function public.list_portal_admin_users(integer, integer) to authenticated;
 grant execute on function public.search_portal_admin_users(integer, integer, text, text, text, text, text, text, text) to authenticated;
@@ -515,8 +667,8 @@ revoke all on function public.search_portal_admin_users(integer, integer, text, 
 revoke all on function public.remove_portal_user(uuid) from public, anon;
 
 insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
-values ('portal-images', 'portal-images', false, 5242880, array['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
-on conflict (id) do update set public = false, file_size_limit = 5242880;
+values ('portal-images', 'portal-images', false, 1048576, array['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+on conflict (id) do update set public = false, file_size_limit = 1048576;
 
 drop policy if exists "Users read their portal images" on storage.objects;
 drop policy if exists "Users upload their portal images" on storage.objects;
@@ -533,13 +685,19 @@ for select to authenticated using (
 );
 create policy "Users upload their portal images" on storage.objects
 for insert to authenticated with check (
-  bucket_id = 'portal-images' and (storage.foldername(name))[1] = auth.uid()::text
+  bucket_id = 'portal-images' and (
+    (storage.foldername(name))[1] = auth.uid()::text or public.is_portal_admin()
+  )
 );
 create policy "Users update their portal images" on storage.objects
 for update to authenticated using (
-  bucket_id = 'portal-images' and (storage.foldername(name))[1] = auth.uid()::text
+  bucket_id = 'portal-images' and (
+    (storage.foldername(name))[1] = auth.uid()::text or public.is_portal_admin()
+  )
 ) with check (
-  bucket_id = 'portal-images' and (storage.foldername(name))[1] = auth.uid()::text
+  bucket_id = 'portal-images' and (
+    (storage.foldername(name))[1] = auth.uid()::text or public.is_portal_admin()
+  )
 );
 create policy "Users delete their portal images" on storage.objects
 for delete to authenticated using (

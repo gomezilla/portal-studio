@@ -4,7 +4,7 @@ A browser-based editor for the supplied Omada captive-portal template. Authentic
 
 ## Gallery and visual presets
 
-The gallery can contain up to 20 slides. Add JPG, PNG, GIF, or WebP images (up to 5 MB each), replace any slide, or remove stock and uploaded images. The first three looks are Material You, Facebook-inspired, and Gaming / Neon; Ocean, Sunset, Forest, Midnight, and Rose are also included.
+The gallery can contain up to 20 slides. Add JPG, PNG, GIF, or WebP images (up to 1 MB each), replace any slide, or remove stock and uploaded images. The first three looks are Material You, Facebook-inspired, and Gaming / Neon; Ocean, Sunset, Forest, Midnight, and Rose are also included.
 
 ## Speed-test access
 
@@ -28,11 +28,11 @@ Open [http://localhost:4173](http://localhost:4173). The editor fetches the bund
 
 Create a portal from the dashboard, then edit its content, plan rows, display options, theme preset, brand color, corner style, and gallery images. The appearance icon in the top bar cycles the editor through device, light, and dark modes. The editor autosaves drafts locally and supports multiple portals. Choose **Export ZIP** to download an Omada-ready archive containing the customized `index.html`, the original authentication and speed-test scripts, stylesheets, and required template images. Replaced gallery images are included in the archive.
 
-Each of the three connection-guide steps has its own sample image control. Replace a sample with a JPG, PNG, GIF, or WebP up to 5 MB, or remove it to omit that image from the preview and exported ZIP.
+Each of the three connection-guide steps has its own sample image control. Replace a sample with a JPG, PNG, GIF, or WebP up to 1 MB, or remove it to omit that image from the preview and exported ZIP. The editor's **Message Prompt** tab customizes the Omada authentication result messages included in exported templates.
 
 The live preview opens in mobile size by default; switch to desktop to inspect the wider layout. Color mode can follow the visitor's device or be fixed to light or dark, and the preview follows that selected setting. The preview-only theme control lets you inspect the opposite mode without changing the saved setting.
 
-After exporting, Portal Studio shows a dismissible success panel with an optional InstaPay QR contribution. A **Support** button in the header opens the same contribution page anytime. Creating a draft does not interrupt the editor with a donation prompt. The exported portal and Portal Studio include a non-editable “Made by Gomezilla Portal Studio” attribution.
+After exporting, Portal Studio shows a dismissible success panel with an optional InstaPay QR contribution. **Support**, the theme control, and the notifications bell remain visible in the top bar; account, feature, and admin actions are grouped under the menu icon. Notifications show pending administrator requests and access request decisions with approved credit totals. Creating a draft does not interrupt the editor with a donation prompt. The exported portal and Portal Studio include a non-editable “Made by Gomezilla Portal Studio” attribution.
 
 Create an account or sign in with an email and password. Signed-in users and administrators can change their password from the top menu. New accounts may need to verify their email before signing in, depending on the Supabase project's email-confirmation setting. Existing users can use **Forgot password?** to set a password; the reset link returns to the site and opens the new-password form automatically. In Supabase Authentication → URL Configuration, allow `https://gomezilla.github.io/portal-studio/` as a redirect URL. If Supabase's built-in email service reaches its rate limit, wait before requesting another email; configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings for reliable delivery.
 
@@ -50,7 +50,7 @@ Supabase must be configured by running the schema and enabling email/password au
 
 ## Account quotas and approval workflow
 
-The app uses Supabase email/password authentication, private image storage, database-enforced one-saved-portal and one-export starting limits, and administrator review of requests for one additional portal/export. The browser publishable key is in `supabase-config.js`; it is designed for public use and is protected by Supabase row-level security. Never put a Supabase service-role key in the website.
+The app uses Supabase email/password authentication, private image storage, database-enforced one-saved-portal and one-export starting limits, and administrator review of requests. New account creation is limited to two accounts per browser device registration, enforced by a database trigger; clearing browser site data or changing the client registration can create a new identifier, so this is an abuse deterrent rather than strong device identity verification. Image uploads are capped at 1 MB per file in both the editor and Supabase Storage. The browser publishable key is in `supabase-config.js`; it is designed for public use and is protected by Supabase row-level security. Never put a Supabase service-role key in the website.
 
 To activate account saving and approvals for a Supabase project:
 
@@ -59,7 +59,7 @@ To activate account saving and approvals for a Supabase project:
 3. In **Authentication → URL Configuration**, set the site URL to `https://gomezilla.github.io/portal-studio/` and add it to the redirect URLs.
 4. Configure email confirmation as desired. If the schema or auth setup is incomplete, account saving/export remain unavailable rather than falling back to an insecure client-side quota.
 
-Each approved request grants a regular account one additional saved portal and one additional export. Admin accounts have unlimited saved portals and exports. The administrator can open **Admin dashboard** to view signup dates, account tenure, idle time, saved-portal/export counts, analytics, pending requests, and remove non-admin users. The user list supports email search, role/activity/portal/export filters, and server-side sorting across the full list. User removal permanently deletes their account, drafts, quota records, requests, and uploaded images. The admin dashboard, unlimited admin quota enforcement, and new SQL RPCs are available only after the current `supabase/schema.sql` has been run. Rerunning the current schema drops and recreates the analytics and user-search RPCs to repair outdated return types and update user-list filtering/sorting. Approval decisions currently appear in the dashboard; the app does not send email notifications for new requests or approval results. The 2 MB ZIP limit is separate from the per-account export allowance.
+Admin approvals record and display the number of template and export credits granted. The administrator can also grant credits directly, open a user's saved templates from their clickable email, edit those templates, and export them without account quotas. The admin dashboard shows total allowed exports and an activity log for approvals, denials, credit grants, and user removals. Admin accounts have unlimited saved portals and exports. The user list supports email search, role/activity/portal/export filters, and server-side sorting across the full list. User removal permanently deletes their account, drafts, quota records, requests, and uploaded images. The admin dashboard, audit log, account-creation limit, and updated SQL RPCs are available only after the current `supabase/schema.sql` has been run. Rerunning the schema applies the latest database changes. The app does not send email notifications for new requests or approval results. The 2 MB ZIP limit is separate from the per-account export allowance.
 
 ## Offline copy
 

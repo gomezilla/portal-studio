@@ -14,7 +14,46 @@
     "res/img/instr/instr3.jpeg"
   ];
   const MAX_GALLERY_IMAGES = 20;
+  const MAX_IMAGE_BYTES = 1_048_576;
   const MAX_EXPORT_BYTES = 2_000_000;
+  const DEFAULT_ERROR_MESSAGES = {
+    "0": "Successful",
+    "-1": "General error.",
+    "-41500": "Invalid authentication type.",
+    "-41501": "Failed to authenticate.",
+    "-41502": "Voucher code is incorrect.(Ayaw'g Pataka)",
+    "-41503": "Voucher is expired.(Gamit na.)",
+    "-41504": "Voucher traffic has exceeded the limit.",
+    "-41505": "The number of users has reached the limit.(Naa nay ni gamit)",
+    "-41506": "Invalid authorization information.",
+    "-41507": "Your authentication times out. You can get authenticated again until the next day.",
+    "-41508": "Local User traffic has exceeded the limit.(Hurot na)",
+    "-41512": "Local User is expired.",
+    "-41513": "Local User is disabled.",
+    "-41514": "MAC address is incorrect.",
+    "-41515": "Local User Quota has exceeded the limit.",
+    "-41516": "The number of users has reached the limit.",
+    "-41517": "Incorrect password.",
+    "-41518": "This SSID does not exist.",
+    "-41519": "Invalid code.",
+    "-41520": "The code is expired.",
+    "-41521": "The number of users has reached the limit.",
+    "-41522": "Failed to validate the code.",
+    "-41523": "Failed to send verification code.",
+    "-41524": "Authentication failed because the username does not exist.",
+    "-41525": "Authentication failed because of wrong password.",
+    "-41526": "Authentication failed because the client is invalid.",
+    "-41527": "Authentication failed because the local user is invalid.",
+    "-41528": "Failed to decrypt data.",
+    "-41529": "Incorrect username or password.",
+    "-41530": "Connecting to the RADIUS server times out.",
+    "-41531": "Your code has reached your Wi-Fi data limit.",
+    "-41532": "Your account has reached your Wi-Fi data limit.",
+    "-41533": "Form authentication request is invalid.",
+    "-43408": "Invalid LDAP configuration.",
+    "-43409": "Invalid LDAP credentials.",
+    "-41538": "Voucher is not effective."
+  };
   const TEMPLATE_FILES = [
     "index.js", "light.css", "dark.css", "speedtest.js", "tabCollapsible.js",
     "res/img/image1.jpg", "res/img/image2.jpeg", "res/img/image3.jpeg", "res/img/image4.jpg", "res/img/image5.jpeg",
@@ -55,6 +94,7 @@
     accentColor: "#6750a4",
     themeMode: "system",
     cornerStyle: "soft",
+    errorMessages: DEFAULT_ERROR_MESSAGES,
     plans: [
       { price: "₱5", duration: "2 hours" },
       { price: "₱10", duration: "5 hours" },
@@ -90,6 +130,11 @@
   let quota = null;
   let isAdmin = false;
   let pendingRequest = null;
+  let userRequests = [];
+  let creditNotifications = [];
+  let adminPendingRequests = [];
+  let adminViewingUser = null;
+  let adminUserProjects = [];
   const remoteDraftIds = new Set();
   let projects = [];
   let dirty = false;
@@ -285,6 +330,7 @@
     } catch (error) {
       showToast(`Could not load admin users: ${error.message}`, true);
     }
+    await loadAdminAuditLog();
   }
 
   async function loadAdminUsers() {
@@ -335,7 +381,7 @@
     if (!adminUsers.length) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 7;
+      cell.colSpan = 8;
       cell.textContent = "No users match these filters.";
       row.append(cell);
       body.append(row);
@@ -344,11 +390,18 @@
     adminUsers.forEach(user => {
       const row = document.createElement("tr");
       const email = document.createElement("td");
-      email.textContent = user.email;
+      const emailLink = document.createElement("button");
+      emailLink.type = "button";
+      emailLink.className = "admin-email-link";
+      emailLink.textContent = user.email;
+      emailLink.addEventListener("click", () => loadAdminUserPortals(user));
+      email.append(emailLink);
       const templates = document.createElement("td");
       templates.textContent = Number(user.templates_saved).toLocaleString();
       const exports = document.createElement("td");
       exports.textContent = Number(user.exports_used).toLocaleString();
+      const exportsAllowed = document.createElement("td");
+      exportsAllowed.textContent = user.is_admin ? "Unlimited" : Number(user.exports_allowed).toLocaleString();
       const signedUp = document.createElement("td");
       signedUp.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(user.signed_up_at));
       const tenure = document.createElement("td");
@@ -356,17 +409,114 @@
       const idle = document.createElement("td");
       idle.textContent = user.last_sign_in_at ? durationLabel(user.last_sign_in_at) : "Never signed in";
       const action = document.createElement("td");
+      const actions = document.createElement("div");
+      actions.className = "admin-action-buttons";
+      const credits = document.createElement("button");
+      credits.type = "button";
+      credits.className = "credit-button";
+      credits.textContent = "＋ Credits";
+      credits.title = "Grant template and export credits";
+      credits.addEventListener("click", () => grantUserCredits(user));
       const remove = document.createElement("button");
       remove.type = "button";
-      remove.className = "image-action remove";
-      remove.textContent = "Remove";
+      remove.className = "icon-button";
+      remove.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16m-10 4v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3" /></svg>';
+      remove.setAttribute("aria-label", `Delete ${user.email}`);
       remove.disabled = user.is_admin;
-      remove.title = remove.disabled ? "Administrator accounts cannot be removed here" : "Remove this user and their saved portals";
+      remove.title = remove.disabled ? "Administrator accounts cannot be removed here" : "Delete this user and their saved portals";
       remove.addEventListener("click", () => removeAdminUser(user));
-      action.append(remove);
-      row.append(email, templates, exports, signedUp, tenure, idle, action);
+      actions.append(credits, remove);
+      action.append(actions);
+      row.append(email, templates, exports, exportsAllowed, signedUp, tenure, idle, action);
       body.append(row);
     });
+  }
+
+  async function loadAdminUserPortals(user) {
+    try {
+      const { data, error } = await supabaseClient.from("portal_drafts")
+        .select("id,user_id,name,payload,updated_at")
+        .eq("user_id", user.account_id)
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      adminUserProjects = [];
+      for (const row of data || []) {
+        const project = normalizeProject(row.payload);
+        project.id = row.id;
+        project.userId = row.user_id;
+        project.name = row.name;
+        project.updatedAt = row.updated_at;
+        remoteDraftIds.add(project.id);
+        adminUserProjects.push(await hydrateCloudImages(project));
+      }
+      adminViewingUser = user;
+      $("#admin-user-portals-title").textContent = `Portals for ${user.email}`;
+      const exportAllowance = user.is_admin
+        ? `${Number(user.exports_used).toLocaleString()} exports used · unlimited account allowance`
+        : `${Number(user.exports_used).toLocaleString()} of ${Number(user.exports_allowed).toLocaleString()} exports used`;
+      $("#admin-user-portals-quota").textContent =
+        `${user.templates_saved} saved · ${exportAllowance} · Administrator preview and exports are unlimited.`;
+      const list = $("#admin-user-portals-list");
+      list.replaceChildren();
+      if (!adminUserProjects.length) {
+        const empty = document.createElement("p");
+        empty.className = "notification-empty";
+        empty.textContent = "This user has no saved portals yet.";
+        list.append(empty);
+      }
+      adminUserProjects.forEach(project => {
+        const row = document.createElement("article");
+        row.className = "admin-user-portal-row";
+        const details = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = project.name || "Untitled Wi-Fi Portal";
+        const edited = document.createElement("p");
+        edited.textContent = `Edited ${formatDate(project.updatedAt)}`;
+        details.append(title, edited);
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "button button-quiet";
+        open.textContent = "Open template";
+        open.addEventListener("click", () => {
+          currentProject = project;
+          openEditor();
+        });
+        row.append(details, open);
+        list.append(row);
+      });
+      $("#admin-users-panel").hidden = true;
+      $("#admin-requests").hidden = true;
+      $("#admin-audit-panel").hidden = true;
+      $("#admin-user-portals").hidden = false;
+      window.scrollTo(0, 0);
+    } catch (error) {
+      showToast(`Could not load this user's portals: ${error.message}`, true);
+    }
+  }
+
+  async function grantUserCredits(user) {
+    const templatesText = window.prompt(`How many template credits should be added for ${user.email}?`, "1");
+    if (templatesText === null) return;
+    const exportsText = window.prompt(`How many export credits should be added for ${user.email}?`, "1");
+    if (exportsText === null) return;
+    const extraTemplates = Number(templatesText);
+    const extraExports = Number(exportsText);
+    if (![extraTemplates, extraExports].every(value => Number.isInteger(value) && value >= 0 && value <= 1000)
+      || (extraTemplates === 0 && extraExports === 0)) {
+      showToast("Enter whole-number credits between 0 and 1000, and grant at least one credit.", true);
+      return;
+    }
+    const { error } = await supabaseClient.rpc("grant_portal_credits", {
+      p_user_id: user.account_id,
+      p_extra_templates: extraTemplates,
+      p_extra_exports: extraExports
+    });
+    if (error) {
+      showToast(`Could not grant credits: ${error.message}`, true);
+      return;
+    }
+    showToast(`Granted ${extraTemplates} template and ${extraExports} export credits to ${user.email}.`);
+    await Promise.all([refreshAdminDashboard(), loadAdminAuditLog()]);
   }
 
   async function removeUserImages(userId) {
@@ -463,8 +613,8 @@
       input.value = "";
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("Images must be 5 MB or smaller.", true);
+    if (file.size > MAX_IMAGE_BYTES) {
+      showToast("Images must be 1 MB or smaller.", true);
       input.value = "";
       return;
     }
@@ -482,6 +632,18 @@
 
   function makeId() {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+  }
+
+  function getPortalDeviceId() {
+    const storageKey = "portal-studio-device-id";
+    let deviceId = localStorage.getItem(storageKey);
+    if (!deviceId || !/^[a-f0-9-]{32,128}$/i.test(deviceId)) {
+      if (!window.crypto?.getRandomValues) throw new Error("This browser cannot create a secure device registration.");
+      const bytes = window.crypto.getRandomValues(new Uint8Array(32));
+      deviceId = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+      localStorage.setItem(storageKey, deviceId);
+    }
+    return deviceId;
   }
 
   function getGuideImageSource(image, index, forPreview) {
@@ -605,26 +767,138 @@
       : pendingRequest
         ? `Your request is ${pendingRequest.status}.`
         : "Each account starts with one saved portal and one export.";
-    $("#request-access-button").hidden = isAdmin || !currentUser || !quota || Boolean(pendingRequest);
+    const requestButton = $("#request-access-button");
+    requestButton.hidden = isAdmin || !currentUser || !quota;
+    requestButton.textContent = pendingRequest ? "Request pending" : "Request more access";
     $("#admin-requests").hidden = !isAdmin;
+    renderNotifications();
+  }
+
+  function renderNotifications() {
+    const list = $("#notification-list");
+    if (!list) return;
+    list.replaceChildren();
+    const items = [];
+    if (isAdmin) {
+      adminPendingRequests.forEach(request => items.push({
+        title: `Access request from ${request.email}`,
+        message: `${request.requested_templates} template and ${request.requested_exports} export credits requested · ${request.reason}`,
+        action: "Review requests"
+      }));
+    }
+    userRequests.forEach(request => {
+      if (request.status === "pending") {
+        items.push({
+          title: "Access request pending",
+          message: `Your request is waiting for administrator review. Requested: ${request.requested_templates} templates and ${request.requested_exports} exports.`
+        });
+      } else {
+        items.push({
+          title: `Access request ${request.status}`,
+          message: request.status === "approved"
+            ? `Approved: ${request.approved_templates} additional templates and ${request.approved_exports} additional exports.${request.reviewed_by ? ` Reviewed by ${request.reviewed_by}.` : ""}`
+            : `Your request was denied.${request.reviewed_by ? ` Reviewed by ${request.reviewed_by}.` : ""}`
+        });
+      }
+    });
+    creditNotifications.forEach(entry => items.push({
+      title: "Additional credits granted",
+      message: `An administrator added ${entry.template_credits} template and ${entry.export_credits} export credits.`
+    }));
+    const count = $("#notification-count");
+    count.hidden = items.length === 0;
+    count.textContent = items.length > 9 ? "9+" : String(items.length);
+    $("#notifications-button").setAttribute("aria-label", `Notifications${items.length ? `, ${items.length} updates` : ""}`);
+    if (!items.length) {
+      const empty = document.createElement("p");
+      empty.className = "notification-empty";
+      empty.textContent = currentUser ? "You're all caught up." : "Sign in to see account notifications.";
+      list.append(empty);
+      return;
+    }
+    items.forEach(item => {
+      const row = document.createElement("article");
+      row.className = "notification-item";
+      const title = document.createElement("strong");
+      title.textContent = item.title;
+      const message = document.createElement("p");
+      message.textContent = item.message;
+      row.append(title, message);
+      if (item.action) {
+        const action = document.createElement("button");
+        action.type = "button";
+        action.className = "text-button";
+        action.textContent = item.action;
+        action.addEventListener("click", () => {
+          $("#notifications-panel").hidden = true;
+          $("#notifications-button").setAttribute("aria-expanded", "false");
+          showAdminDashboard();
+        });
+        row.append(action);
+      }
+      list.append(row);
+    });
+  }
+
+  async function refreshNotifications() {
+    if (!currentUser || !supabaseClient) {
+      renderNotifications();
+      return;
+    }
+    try {
+      const [requestsResult, creditsResult] = await Promise.all([
+        supabaseClient.from("portal_access_requests")
+          .select("id,status,created_at,reviewed_at,reviewed_by,reason,requested_templates,requested_exports,approved_templates,approved_exports")
+          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(30),
+        supabaseClient.from("portal_access_audit_log")
+          .select("id,template_credits,export_credits,created_at")
+          .eq("user_id", currentUser.id).eq("action", "credits_granted")
+          .order("created_at", { ascending: false }).limit(30)
+      ]);
+      const { data: requests, error: requestsError } = requestsResult;
+      if (requestsError) throw requestsError;
+      if (creditsResult.error) throw creditsResult.error;
+      userRequests = requests || [];
+      creditNotifications = creditsResult.data || [];
+      pendingRequest = userRequests.find(request => request.status === "pending") || null;
+      if (isAdmin) {
+        const { data: pending, error: pendingError } = await supabaseClient.from("portal_access_requests")
+          .select("id,email,reason,requested_templates,requested_exports,created_at")
+          .eq("status", "pending").order("created_at", { ascending: true });
+        if (pendingError) throw pendingError;
+        adminPendingRequests = pending || [];
+      }
+      updateAccountControls();
+    } catch (error) {
+      showToast(`Could not refresh notifications: ${error.message}`, true);
+    }
   }
 
   async function loadAccountData() {
     if (!currentUser || !supabaseClient) return;
     try {
-      const [draftsResult, quotaResult, adminResult, requestResult] = await Promise.all([
-        supabaseClient.from("portal_drafts").select("id,user_id,name,payload,updated_at").order("updated_at", { ascending: false }),
+      const [draftsResult, quotaResult, adminResult, requestResult, creditsResult] = await Promise.all([
+        supabaseClient.from("portal_drafts").select("id,user_id,name,payload,updated_at").eq("user_id", currentUser.id).order("updated_at", { ascending: false }),
         supabaseClient.rpc("get_my_portal_quota"),
         supabaseClient.rpc("is_portal_admin"),
-        supabaseClient.from("portal_access_requests").select("id,status,created_at").eq("user_id", currentUser.id).eq("status", "pending").maybeSingle()
+        supabaseClient.from("portal_access_requests")
+          .select("id,status,created_at,reviewed_at,reviewed_by,reason,requested_templates,requested_exports,approved_templates,approved_exports")
+          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(30),
+        supabaseClient.from("portal_access_audit_log")
+          .select("id,template_credits,export_credits,created_at")
+          .eq("user_id", currentUser.id).eq("action", "credits_granted")
+          .order("created_at", { ascending: false }).limit(30)
       ]);
       if (draftsResult.error) throw draftsResult.error;
       if (quotaResult.error) throw quotaResult.error;
       if (adminResult.error) throw adminResult.error;
       if (requestResult.error) throw requestResult.error;
+      if (creditsResult.error) throw creditsResult.error;
       quota = quotaResult.data?.[0] || null;
       isAdmin = adminResult.data === true;
-      pendingRequest = requestResult.data;
+      userRequests = requestResult.data || [];
+      creditNotifications = creditsResult.data || [];
+      pendingRequest = userRequests.find(request => request.status === "pending") || null;
       remoteDraftIds.clear();
       const loaded = [];
       for (const row of draftsResult.data || []) {
@@ -638,6 +912,7 @@
       projects = loaded;
       window.portalStudioSetupError = "";
       updateAccountControls();
+      renderNotifications();
       renderDashboard();
       if (isAdmin) {
         await Promise.all([renderAdminRequests(), refreshAdminDashboard()]);
@@ -646,6 +921,10 @@
       quota = null;
       window.portalStudioSetupError = `Account storage is not ready: ${error.message}. Run supabase/schema.sql in the Supabase SQL Editor and complete the setup steps in README.`;
       projects = [];
+      userRequests = [];
+      creditNotifications = [];
+      pendingRequest = null;
+      renderNotifications();
       renderDashboard();
     }
   }
@@ -673,7 +952,8 @@
   async function persistCloudProject(project) {
     if (!currentUser || !quota) throw new Error("Sign in and load your account quota before saving.");
     const payload = JSON.parse(JSON.stringify(project));
-    const folder = `${currentUser.id}/${safeFilename(project.id)}`;
+    const ownerId = project.userId || currentUser.id;
+    const folder = `${ownerId}/${safeFilename(project.id)}`;
     const uploadImages = async (images, filename) => {
       for (let index = 0; index < images.length; index += 1) {
         const image = images[index];
@@ -704,13 +984,13 @@
     }
     const record = {
       id: project.id,
-      user_id: currentUser.id,
+      user_id: ownerId,
       name: project.name || "Untitled Wi-Fi Portal",
       payload,
       updated_at: new Date().toISOString()
     };
     const result = remoteDraftIds.has(project.id)
-      ? await supabaseClient.from("portal_drafts").update(record).eq("id", project.id).eq("user_id", currentUser.id).select("id").single()
+      ? await supabaseClient.from("portal_drafts").update(record).eq("id", project.id).eq("user_id", ownerId).select("id").single()
       : await supabaseClient.from("portal_drafts").insert(record).select("id").single();
     if (result.error) throw result.error;
     remoteDraftIds.add(project.id);
@@ -727,6 +1007,8 @@
       showToast(`Could not load access requests: ${error.message}`, true);
       return;
     }
+    adminPendingRequests = data || [];
+    renderNotifications();
     $("#admin-request-count").textContent = `${data.length} pending`;
     data.forEach(request => {
       const row = document.createElement("article");
@@ -735,11 +1017,11 @@
       const email = document.createElement("strong");
       email.textContent = request.email;
       const reason = document.createElement("p");
-      reason.textContent = request.reason;
+      reason.textContent = `${request.reason} · Requested ${request.requested_templates} template and ${request.requested_exports} export credits`;
       text.append(email, reason);
       const actions = document.createElement("div");
       actions.className = "admin-request-actions";
-      [["Approve +1", true], ["Deny", false]].forEach(([label, approved]) => {
+      [["Approve…", true], ["Deny", false]].forEach(([label, approved]) => {
         const button = document.createElement("button");
         button.textContent = label;
         if (approved) button.className = "approve";
@@ -752,18 +1034,81 @@
     $("#admin-requests").hidden = !isAdmin;
   }
 
+  async function loadAdminAuditLog() {
+    const body = $("#admin-audit-rows");
+    if (!body || !isAdmin) return;
+    const { data, error } = await supabaseClient.from("portal_access_audit_log")
+      .select("id,admin_email,user_email,action,template_credits,export_credits,details,created_at")
+      .order("created_at", { ascending: false }).limit(100);
+    if (error) {
+      showToast(`Could not load admin activity: ${error.message}`, true);
+      return;
+    }
+    body.replaceChildren();
+    if (!data?.length) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 7;
+      cell.textContent = "No admin activity has been recorded.";
+      row.append(cell);
+      body.append(row);
+      return;
+    }
+    const labels = {
+      request_approved: "Request approved",
+      request_denied: "Request denied",
+      credits_granted: "Credits granted",
+      user_removed: "User deleted"
+    };
+    data.forEach(entry => {
+      const row = document.createElement("tr");
+      const values = [
+        new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(entry.created_at)),
+        entry.admin_email,
+        entry.user_email,
+        labels[entry.action] || entry.action,
+        Number(entry.template_credits).toLocaleString(),
+        Number(entry.export_credits).toLocaleString(),
+        entry.details?.reason || ""
+      ];
+      values.forEach(value => {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        row.append(cell);
+      });
+      body.append(row);
+    });
+  }
+
   async function reviewAccessRequest(id, approved) {
+    let extraTemplates = 0;
+    let extraExports = 0;
+    if (approved) {
+      const templatesText = window.prompt("How many additional templates should be approved?", "1");
+      if (templatesText === null) return;
+      const exportsText = window.prompt("How many additional exports should be approved?", "1");
+      if (exportsText === null) return;
+      extraTemplates = Number(templatesText);
+      extraExports = Number(exportsText);
+      if (![extraTemplates, extraExports].every(value => Number.isInteger(value) && value >= 0 && value <= 10)
+        || (extraTemplates === 0 && extraExports === 0)) {
+        showToast("Enter whole-number grants between 0 and 10, and approve at least one credit.", true);
+        return;
+      }
+    }
     const { error } = await supabaseClient.rpc("review_portal_access_request", {
       p_request_id: id,
       p_approve: approved,
-      p_extra_templates: approved ? 1 : 0,
-      p_extra_exports: approved ? 1 : 0
+      p_extra_templates: extraTemplates,
+      p_extra_exports: extraExports
     });
     if (error) {
       showToast(`Could not review request: ${error.message}`, true);
       return;
     }
-    showToast(approved ? "Request approved." : "Request denied.");
+    showToast(approved
+      ? `Request approved: ${extraTemplates} template and ${extraExports} export credits.`
+      : "Request denied.");
     await loadAccountData();
   }
 
@@ -777,6 +1122,12 @@
     const defaultSettings = JSON.parse(JSON.stringify(DEFAULTS));
     const settings = { ...defaultSettings, ...(project.settings || {}) };
     settings.plans = Array.isArray(project.settings?.plans) ? project.settings.plans : defaultSettings.plans;
+    settings.errorMessages = Object.fromEntries(Object.keys(DEFAULT_ERROR_MESSAGES).map(code => [
+      code,
+      typeof project.settings?.errorMessages?.[code] === "string"
+        ? project.settings.errorMessages[code]
+        : DEFAULT_ERROR_MESSAGES[code]
+    ]));
     const images = Array.isArray(project.images)
       ? project.images.filter(image => image && typeof image.src === "string").slice(0, MAX_GALLERY_IMAGES)
       : IMAGE_PATHS.map(path => ({ src: path, name: path.split("/").pop() }));
@@ -893,6 +1244,7 @@
 
   function openEditor() {
     dashboardView.hidden = true;
+    adminDashboardView.hidden = true;
     editorView.hidden = false;
     document.body.classList.add("editor-active");
     $("#top-save-button").hidden = false;
@@ -917,10 +1269,16 @@
     if (dirty) saveCurrentProject(true);
     document.body.classList.remove("editor-active");
     editorView.hidden = true;
-    adminDashboardView.hidden = true;
-    dashboardView.hidden = false;
     $("#top-save-button").hidden = true;
-    renderDashboard();
+    if (adminViewingUser && isAdmin) {
+      dashboardView.hidden = true;
+      adminDashboardView.hidden = false;
+      $("#admin-user-portals").hidden = false;
+    } else {
+      adminDashboardView.hidden = true;
+      dashboardView.hidden = false;
+      renderDashboard();
+    }
   }
 
   async function showAdminDashboard() {
@@ -929,6 +1287,11 @@
     editorView.hidden = true;
     dashboardView.hidden = true;
     adminDashboardView.hidden = false;
+    adminViewingUser = null;
+    $("#admin-users-panel").hidden = false;
+    $("#admin-requests").hidden = false;
+    $("#admin-audit-panel").hidden = false;
+    $("#admin-user-portals").hidden = true;
     $("#top-save-button").hidden = true;
     await refreshAdminDashboard();
     await renderAdminRequests();
@@ -942,7 +1305,7 @@
     $("#auth-description").textContent = recovery
       ? "Choose a new password for your Portal Studio account."
       : signUp
-      ? "Create an account with your email and a password to save and export portals."
+      ? "Create an account with your email and password. Each browser device can register up to two accounts."
       : "Sign in with your email and password. Your saved portals and export allowance follow your account.";
     $("#auth-submit").textContent = recovery ? "Update password" : signUp ? "Create account" : "Sign in";
     $("#auth-mode-toggle").textContent = signUp ? "Already have an account? Sign in" : "New here? Create an account";
@@ -1015,6 +1378,30 @@
     });
     $("#accent-hex").textContent = settings.accentColor.toUpperCase();
     $("#speedtest-preauth-help").hidden = !settings.showSpeedtest;
+    renderMessagePromptFields();
+  }
+
+  function renderMessagePromptFields() {
+    const list = $("#message-prompt-list");
+    list.replaceChildren();
+    Object.keys(DEFAULT_ERROR_MESSAGES).forEach(code => {
+      const row = document.createElement("label");
+      row.className = "message-prompt-item";
+      const codeLabel = document.createElement("code");
+      codeLabel.textContent = code;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.maxLength = 250;
+      input.value = currentProject.settings.errorMessages[code] || "";
+      input.setAttribute("aria-label", `Message for error ${code}`);
+      input.placeholder = DEFAULT_ERROR_MESSAGES[code];
+      input.addEventListener("input", () => {
+        currentProject.settings.errorMessages[code] = input.value;
+        scheduleSave();
+      });
+      row.append(codeLabel, input);
+      list.append(row);
+    });
   }
 
   function renderPlanRows() {
@@ -1117,8 +1504,8 @@
       input.value = "";
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("Images must be 5 MB or smaller.", true);
+    if (file.size > MAX_IMAGE_BYTES) {
+      showToast("Images must be 1 MB or smaller.", true);
       input.value = "";
       return;
     }
@@ -1453,6 +1840,15 @@
     if (!currentProject.settings.showSpeedtest) {
       doc.querySelector('script[src="speedtest.js"]')?.remove();
     }
+    const messagesScript = doc.createElement("script");
+    const messagesJson = JSON.stringify(currentProject.settings.errorMessages)
+      .replace(/</g, "\\u003c")
+      .replace(/\u2028/g, "\\u2028")
+      .replace(/\u2029/g, "\\u2029");
+    messagesScript.textContent = `window.portalStudioErrorMessages=${messagesJson};`;
+    const authScript = doc.querySelector('script[src="index.js"]');
+    if (!authScript) throw new Error("The template authentication script is missing.");
+    authScript.before(messagesScript);
 
     const customizedHtml = `<!doctype html>\n${doc.documentElement.outerHTML}`;
     const files = [{ path: "index.html", data: new TextEncoder().encode(customizedHtml) }];
@@ -1716,6 +2112,11 @@
         } else if (event === "SIGNED_OUT") {
           currentUser = null;
           projects = [];
+          userRequests = [];
+          creditNotifications = [];
+          adminPendingRequests = [];
+          adminViewingUser = null;
+          adminUserProjects = [];
           currentProject = null;
           quota = null;
           isAdmin = false;
@@ -1750,6 +2151,44 @@
   }
 
   $("#sign-in-button").addEventListener("click", () => $("#auth-dialog").showModal());
+  $("#topbar-menu-toggle").addEventListener("click", event => {
+    const button = event.currentTarget;
+    const panel = $("#topbar-menu-panel");
+    const open = panel.hidden;
+    panel.hidden = !open;
+    button.setAttribute("aria-expanded", String(open));
+    button.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+  });
+  $("#topbar-menu-panel").addEventListener("click", event => {
+    if (event.target.closest("button")) {
+      $("#topbar-menu-panel").hidden = true;
+      $("#topbar-menu-toggle").setAttribute("aria-expanded", "false");
+      $("#topbar-menu-toggle").setAttribute("aria-label", "Open menu");
+    }
+  });
+  $("#notifications-button").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    const panel = $("#notifications-panel");
+    const open = panel.hidden;
+    panel.hidden = !open;
+    button.setAttribute("aria-expanded", String(open));
+    if (open) await refreshNotifications();
+  });
+  $("#notifications-close").addEventListener("click", () => {
+    $("#notifications-panel").hidden = true;
+    $("#notifications-button").setAttribute("aria-expanded", "false");
+  });
+  document.addEventListener("click", event => {
+    if (!event.target.closest(".topbar-menu")) {
+      $("#topbar-menu-panel").hidden = true;
+      $("#topbar-menu-toggle").setAttribute("aria-expanded", "false");
+      $("#topbar-menu-toggle").setAttribute("aria-label", "Open menu");
+    }
+    if (!event.target.closest(".notification-wrap")) {
+      $("#notifications-panel").hidden = true;
+      $("#notifications-button").setAttribute("aria-expanded", "false");
+    }
+  });
   $("#support-button").addEventListener("click", () => showThankYou("support"));
   $("#offline-folder-button")?.addEventListener("click", chooseOfflineExportFolder);
   $("#password-change-button")?.addEventListener("click", () => {
@@ -1809,7 +2248,11 @@
       const { data, error } = recovery
         ? await supabaseClient.auth.updateUser({ password })
         : signUp
-          ? await supabaseClient.auth.signUp({ email, password })
+          ? await supabaseClient.auth.signUp({
+            email,
+            password,
+            options: { data: { portal_device_id: getPortalDeviceId() } }
+          })
           : await supabaseClient.auth.signInWithPassword({ email, password });
       if (error) throw error;
       if (recovery) {
@@ -1829,8 +2272,14 @@
       const errorText = error.message || String(error);
       const rateLimited = /rate.?limit|too many requests/i.test(errorText);
       message.classList.toggle("warning", rateLimited);
+      const deviceLimit = signUp && /device|account limit/i.test(errorText);
+      const accountCreationError = signUp && /database error saving new user/i.test(errorText);
       const invalidCredentials = !signUp && !recovery && /invalid login credentials/i.test(errorText);
-      message.textContent = rateLimited
+      message.textContent = deviceLimit
+        ? "This device has reached its limit of two Portal Studio accounts."
+        : accountCreationError
+          ? `Could not create the account. Account creation is limited to two accounts per browser device; if you have not reached that limit, contact the administrator. (${errorText})`
+        : rateLimited
         ? "Supabase’s email rate limit has been reached. Wait before trying again. For reliable delivery, configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings."
         : invalidCredentials
           ? "This email/password pair was not accepted. If this admin account previously used sign-in links, use “Forgot password?” to set a password. If no account exists yet, create one with the admin email and verify it before signing in."
@@ -1867,7 +2316,17 @@
   });
   $("#app-theme-toggle").addEventListener("click", cycleAppTheme);
   $("#admin-dashboard-button").addEventListener("click", showAdminDashboard);
-  $("#admin-return-button").addEventListener("click", showDashboard);
+  $("#admin-return-button").addEventListener("click", () => {
+    adminViewingUser = null;
+    showDashboard();
+  });
+  $("#admin-user-portals-back").addEventListener("click", () => {
+    adminViewingUser = null;
+    $("#admin-users-panel").hidden = false;
+    $("#admin-requests").hidden = false;
+    $("#admin-audit-panel").hidden = false;
+    $("#admin-user-portals").hidden = true;
+  });
   $("#features-button").addEventListener("click", () => $("#features-dialog").showModal());
   $("#features-close").addEventListener("click", () => $("#features-dialog").close());
   $("#features-done").addEventListener("click", () => $("#features-dialog").close());
@@ -1917,6 +2376,10 @@
     else setContentWizardStep(contentWizardStep + 1);
   });
   $("#request-access-button").addEventListener("click", async () => {
+    if (pendingRequest) {
+      window.alert("You already have an access request waiting for administrator review. Please wait for a decision before submitting another request.");
+      return;
+    }
     const reason = window.prompt("Why do you need additional saved portal and export access?");
     if (!reason) return;
     const { error } = await supabaseClient.rpc("request_extra_portal_access", { p_reason: reason });

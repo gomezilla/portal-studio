@@ -70,6 +70,15 @@ var errorHintMap = {
     "-41538": "Voucher is not effective."
 };
 
+if (window.portalStudioErrorMessages) {
+    Object.keys(errorHintMap).forEach(function(code) {
+        var customized = window.portalStudioErrorMessages[code];
+        if (typeof customized === "string" && customized.trim()) {
+            errorHintMap[code] = customized;
+        }
+    });
+}
+
 var isCommited;
 
 function getQueryStringKey(key) {
@@ -138,7 +147,7 @@ Ajax.post(
         function pageConfigParse() {
             if (res.errorCode !== 0) {
                 document.getElementById("oper-hint").style.display = "block";
-                document.getElementById("oper-hint").innerHTML = errorHintMap[res.errorCode];
+                document.getElementById("oper-hint").textContent = errorHintMap[res.errorCode];
             }
             document.getElementById("hotspot-section").style.display = "none";
             document.getElementById("input-voucher").style.display = "none";
@@ -165,14 +174,15 @@ Ajax.post(
                     window.authType = 15;
                     break;
                 case 11:
-                    document.getElementById("hotspot-section").style.display = "block";
+                    var hotspotSelector = document.getElementById("hotspot-selector");
                     var options = "";
                     for (var i = 0; i < globalConfig.hotspotTypes.length; i++) {
                         options += '<option value="' + globalConfig.hotspotTypes[i] + '">' + hotspotMap[globalConfig.hotspotTypes[i]] + '</option>';
                     }
-                    document.getElementById("hotspot-selector").innerHTML = options;
+                    hotspotSelector.innerHTML = options;
                     hotspotChang(globalConfig.hotspotTypes[0]);
                     window.authType = globalConfig.hotspotTypes[0];
+                    document.getElementById("hotspot-section").style.display = globalConfig.hotspotTypes.length > 1 ? "block" : "none";
                     break;
             }
         }
@@ -235,9 +245,9 @@ Ajax.post(
                             isCommited = true;
                             landingUrl = data.result || landingUrl;
                             window.location.href = landingUrl;
-                            document.getElementById("oper-hint").innerHTML = errorHintMap[data.errorCode];
+                            document.getElementById("oper-hint").textContent = errorHintMap[data.errorCode];
                         } else {
-                            document.getElementById("oper-hint").innerHTML = errorHintMap[data.errorCode];
+                            document.getElementById("oper-hint").textContent = errorHintMap[data.errorCode];
                         }
                     });
                 }
@@ -298,15 +308,15 @@ Ajax.post(
                     }), function(data) {
                         data = JSON.parse(data);
                         if (data.errorCode !== 0) {
-                            document.getElementById("oper-hint").innerHTML = errorHintMap[data.errorCode];
+                            document.getElementById("oper-hint").textContent = errorHintMap[data.errorCode];
                         } else {
-                            document.getElementById("oper-hint").innerHTML = "SMS has been sent successfully.";
+                            document.getElementById("oper-hint").textContent = "SMS has been sent successfully.";
                         }
                     }
                 );
             }
             sendSmsAuthCode();
-            document.getElementById("oper-hint").innerHTML = "Sending Authorization Code...";
+            document.getElementById("oper-hint").textContent = "Sending Authorization Code...";
         });
         pageConfigParse();
     }

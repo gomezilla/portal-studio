@@ -17,14 +17,29 @@
     <div class="topbar-right">
       <span class="save-indicator" id="save-indicator"><i></i> All changes saved</span>
       <span class="account-email" id="account-email" hidden></span>
-      <button class="button button-quiet" id="sign-in-button" type="button">Sign in</button>
-      <button class="button button-quiet" id="sign-out-button" type="button" hidden>Sign out</button>
-      <button class="button button-quiet" id="password-change-button" type="button" hidden>Change password</button>
-      <button class="button button-quiet" id="features-button" type="button" aria-haspopup="dialog" aria-controls="features-dialog">Features</button>
-      <button class="button button-quiet" id="admin-dashboard-button" type="button" hidden>Admin dashboard</button>
-      <button class="button button-primary" id="top-save-button" type="button" hidden>Save draft</button>
       <button class="button button-quiet" id="support-button" type="button">Support</button>
       <button class="button button-quiet app-theme-button" id="app-theme-toggle" type="button" aria-label="Appearance: Follow device" title="Appearance: Follow device"><span id="app-theme-icon" aria-hidden="true">◐</span></button>
+      <div class="notification-wrap">
+        <button class="button button-quiet notification-button" id="notifications-button" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notifications-panel">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12h4" /></svg>
+          <span class="notification-count" id="notification-count" hidden></span>
+        </button>
+        <section class="notification-panel" id="notifications-panel" aria-label="Notifications" hidden>
+          <div class="notification-heading"><strong>Notifications</strong><button class="icon-button" id="notifications-close" type="button" aria-label="Close notifications">×</button></div>
+          <div id="notification-list" aria-live="polite"></div>
+        </section>
+      </div>
+      <div class="topbar-menu">
+        <button class="button button-quiet menu-toggle" id="topbar-menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="topbar-menu-panel"><span aria-hidden="true">☰</span></button>
+        <div class="topbar-menu-panel" id="topbar-menu-panel" hidden>
+          <button class="menu-item" id="sign-in-button" type="button">Sign in</button>
+          <button class="menu-item" id="sign-out-button" type="button" hidden>Sign out</button>
+          <button class="menu-item" id="password-change-button" type="button" hidden>Change password</button>
+          <button class="menu-item" id="features-button" type="button" aria-haspopup="dialog" aria-controls="features-dialog">Features</button>
+          <button class="menu-item" id="admin-dashboard-button" type="button" hidden>Admin dashboard</button>
+          <button class="menu-item" id="top-save-button" type="button" hidden>Save draft</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -103,7 +118,7 @@
         <article class="analytics-card"><span>Signups in last 30 days</span><strong id="metric-signups">—</strong></article>
         <article class="analytics-card"><span>Pending access requests</span><strong id="metric-requests">—</strong></article>
       </div>
-      <section class="admin-users-panel">
+      <section class="admin-users-panel" id="admin-users-panel">
         <div class="library-heading">
           <div><h2>Users</h2><span class="count-label" id="admin-user-count">Loading…</span></div>
         </div>
@@ -118,8 +133,8 @@
         </div>
         <div class="admin-table-wrap">
           <table class="admin-users-table">
-            <thead><tr><th>Email</th><th>Templates</th><th>Exports</th><th>Signed up</th><th>Tenure</th><th>Idle</th><th>Action</th></tr></thead>
-            <tbody id="admin-user-rows"><tr><td colspan="7">Loading accounts…</td></tr></tbody>
+            <thead><tr><th>Email</th><th>Templates</th><th>Exports used</th><th>Total allowed exports</th><th>Signed up</th><th>Tenure</th><th>Idle</th><th>Action</th></tr></thead>
+            <tbody id="admin-user-rows"><tr><td colspan="8">Loading accounts…</td></tr></tbody>
           </table>
         </div>
         <div class="admin-pagination"><button class="button button-quiet" id="admin-users-prev" type="button">Previous</button><span id="admin-users-page">Page 1</span><button class="button button-quiet" id="admin-users-next" type="button">Next</button></div>
@@ -127,6 +142,22 @@
       <section class="admin-requests" id="admin-requests" hidden>
         <div class="subsection-heading"><h2>Access requests</h2><span id="admin-request-count"></span></div>
         <div id="admin-request-list"></div>
+      </section>
+      <section class="admin-user-portals" id="admin-user-portals" hidden>
+        <div class="subsection-heading">
+          <div><h2 id="admin-user-portals-title">User portals</h2><p id="admin-user-portals-quota"></p></div>
+          <button class="button button-quiet" id="admin-user-portals-back" type="button">Back to users</button>
+        </div>
+        <div id="admin-user-portals-list"></div>
+      </section>
+      <section class="admin-audit-panel" id="admin-audit-panel">
+        <div class="subsection-heading"><h2>Admin activity log</h2><span>Latest 100 actions</span></div>
+        <div class="admin-table-wrap">
+          <table class="admin-audit-table">
+            <thead><tr><th>Date</th><th>Admin</th><th>User</th><th>Action</th><th>Template credits</th><th>Export credits</th><th>Details</th></tr></thead>
+            <tbody id="admin-audit-rows"><tr><td colspan="6">Loading activity…</td></tr></tbody>
+          </table>
+        </div>
       </section>
     </section>
 
@@ -152,6 +183,7 @@
             <button class="settings-tab active" role="tab" aria-selected="true" aria-controls="content-panel" id="content-tab" data-panel="content-panel">Content</button>
             <button class="settings-tab" role="tab" aria-selected="false" aria-controls="style-panel" id="style-tab" data-panel="style-panel">Style</button>
             <button class="settings-tab" role="tab" aria-selected="false" aria-controls="images-panel" id="images-tab" data-panel="images-panel">Images</button>
+            <button class="settings-tab" role="tab" aria-selected="false" aria-controls="messages-panel" id="messages-tab" data-panel="messages-panel">Message Prompt</button>
           </div>
           <div class="settings-scroll">
             <section class="settings-section tab-panel" id="content-panel" role="tabpanel" aria-labelledby="content-tab">
@@ -279,11 +311,20 @@
                 <span class="step-number">03</span>
                 <div><h2>Tell your story</h2><p>Replace any slide in the rotating gallery.</p></div>
               </div>
-              <p class="images-note">Use JPG, PNG, GIF, or WebP images up to 5 MB each. Your original images are preserved unless replaced.</p>
+              <p class="images-note">Use JPG, PNG, GIF, or WebP images up to 1 MB each. Your original images are preserved unless replaced.</p>
               <button class="button button-quiet add-image-button" id="add-gallery-image-button" type="button">＋ Add gallery image</button>
               <input id="gallery-image-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
               <p class="gallery-count" id="gallery-count" aria-live="polite"></p>
               <div class="image-slots" id="image-slots"></div>
+            </section>
+
+            <section class="settings-section tab-panel" id="messages-panel" role="tabpanel" aria-labelledby="messages-tab" hidden>
+              <div class="section-intro">
+                <span class="step-number">04</span>
+                <div><h2>Message Prompt</h2><p>Customize the messages shown when Omada reports an authentication result.</p></div>
+              </div>
+              <p class="images-note">Edit the text for each error code. Leave a field blank to use Omada's default message.</p>
+              <div class="message-prompt-list" id="message-prompt-list"></div>
             </section>
           </div>
         </aside>
