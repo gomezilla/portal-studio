@@ -75,6 +75,4 @@ The app does not collect IP addresses for signup limits. IP-only account limits 
 
 ## Offline copy
 
-A separate no-authentication version is available in `/Users/system32/Documents/omada-portal-studio-offline`. Run `python3 -m http.server 4173` from that folder and open `http://localhost:4173`. It saves drafts and gallery images in browser IndexedDB with no account or template/export-count limits. The strict under-2-MB ZIP limit still applies. In a supported browser, choose the `saved-portals/` folder from the editor to write ZIP exports there; otherwise exports use the browser's regular download flow. Browser drafts are local to that browser and can be lost if its site data is cleared, so keep ZIP backups.
-
-For macOS, use the [Portal Studio Offline DMG installer](../omada-portal-studio-offline/dist/Portal-Studio-Offline-macOS.dmg). It is built for Apple Silicon and is locally signed but not Apple-notarized, so macOS may require Control-click → **Open** the first time.
+The no-account offline edition is maintained separately in a private repository; access requires the repository owner's authorization. Its source and macOS installer are not distributed in this public repository. The offline edition saves drafts and gallery images in browser IndexedDB and does not require Supabase for editing or export. Browser drafts are local to that browser and can be lost if its site data is cleared, so keep ZIP backups.
