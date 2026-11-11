@@ -18,6 +18,7 @@ window.onload = function() {
                   content.appendChild(node.cloneNode(true));
               });
               dialog.showModal();
+              dialog.scrollTop = 0;
               return;
           }
           var alreadyActive = this.classList.contains('active');
@@ -39,6 +40,14 @@ window.onload = function() {
 
   document.getElementById("info-dialog-close").addEventListener("click", function() {
       document.getElementById("info-dialog").close();
+  });
+  document.getElementById("info-dialog-dismiss").addEventListener("click", function() {
+      document.getElementById("info-dialog").close();
+  });
+  document.getElementById("info-dialog").addEventListener("click", function(event) {
+      var bounds = this.getBoundingClientRect();
+      if (event.target === this && (event.clientX < bounds.left || event.clientX > bounds.right ||
+          event.clientY < bounds.top || event.clientY > bounds.bottom)) this.close();
   });
 
   var passwordInput = document.getElementById('password');

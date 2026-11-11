@@ -236,6 +236,9 @@ body {
     box-shadow: 0 0 0 4px var(--focus-ring);
 }
 .form-group input:focus, #country-code:focus, #phone-number:focus, #voucherCode:focus, #username:focus, #password:focus, #simplePassword:focus, #verify-code:focus { outline: none; }
+.voucher-input { position: relative; }
+.voucher-icon { position: absolute; top: 50%; left: 13px; width: 20px; height: 20px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+#voucherCode { padding-left: 43px; }
 .password-wrapper { position: relative; }
 .password-toggle { position: absolute; top: 27px; right: 8px; min-height: 32px; padding: 6px 8px; border: 0; border-radius: 7px; background: transparent; box-shadow: none; color: var(--primary); cursor: pointer; font: inherit; font-size: 12px; font-weight: 650; }
 .password-toggle:hover { transform: none; background: var(--primary-soft); box-shadow: none; }
@@ -323,8 +326,10 @@ td:first-child { font-weight: 700; }
 .hotspot-tabs button.active { color: white; border-color: var(--primary); background: var(--primary); }
 .info-dialog { width: min(520px, calc(100% - 28px)); max-height: 82vh; padding: 0; overflow: auto; border: 1px solid var(--border); border-radius: 18px; color: var(--text); background: var(--surface); box-shadow: var(--shadow); }
 .info-dialog::backdrop { background: rgba(12, 24, 45, .68); }
-.info-dialog-card { padding: 26px; }
-.info-dialog-card h2 { margin: 0 0 16px; font-size: 20px; }
+.info-dialog-card { position: relative; padding: 26px; }
+.info-dialog-dismiss { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 50%; color: var(--muted); background: var(--surface-soft); font-size: 22px; cursor: pointer; }
+.info-dialog-dismiss:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.info-dialog-card h2 { margin: 0 38px 16px 0; font-size: 20px; }
 .info-dialog-content p { color: var(--muted); line-height: 1.6; }
 .info-dialog-content img { display: block; max-width: 100%; max-height: 350px; margin: 10px auto 16px; border-radius: 10px; }
 .info-dialog-card > .button { width: 100%; margin-top: 16px; }
