@@ -57,7 +57,7 @@
     "-41538": "Voucher is not effective."
   };
   const TEMPLATE_FILES = [
-    "index.js", "light.css", "dark.css", "speedtest.js", "tabCollapsible.js",
+    "index.js", "light.css", "dark.css", "speedtest.js", "connectivity.js", "tabCollapsible.js",
     "res/img/image1.jpg", "res/img/image2.jpeg", "res/img/image3.jpeg", "res/img/image4.jpg", "res/img/image5.jpeg",
     ...GUIDE_IMAGE_PATHS
   ];
@@ -178,6 +178,8 @@ Review and adapt these sample terms to the network operator's actual practices a
   let toastTimer = 0;
   let sizeCheckTimer = 0;
   let previewThemeOverride = null;
+  let previewDevice = "desktop";
+  let previewZoom = null;
   let passwordRecoveryPromptShown = false;
   let contentWizardStep = 0;
   const templateAssets = new Map();
@@ -1561,6 +1563,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     renderPresets();
     previewThemeOverride = null;
     setPreviewThemeButton();
+    setPreviewDevice("desktop");
     setDirty(false);
     updatePreview();
     queueExportSizeCheck();
@@ -2115,6 +2118,35 @@ Review and adapt these sample terms to the network operator's actual practices a
     const doc = new DOMParser().parseFromString(templateHtml, "text/html");
     applySettingsToDocument(doc, getPreviewThemeMode(), true);
     previewFrame.srcdoc = `<!doctype html>${doc.documentElement.outerHTML}`;
+  }
+
+  function updatePreviewScale() {
+    const canvas = $(".preview-canvas");
+    const frame = $(".browser-frame");
+    if (!canvas.clientWidth) return;
+    const width = previewDevice === "desktop" ? 1024 : 390;
+    const scale = previewZoom === null ? Math.min(1, canvas.clientWidth / width) : previewZoom;
+    frame.style.setProperty("--viewport-width", `${width}px`);
+    frame.style.setProperty("--preview-scale", scale);
+    frame.style.setProperty("--scaled-width", `${width * scale}px`);
+    frame.style.setProperty("--scaled-height", `${800 * scale}px`);
+    $("#preview-zoom-value").textContent = `${Math.round(scale * 100)}%`;
+    $("#preview-zoom-out").disabled = scale <= 0.25;
+    $("#preview-zoom-in").disabled = scale >= 2;
+  }
+
+  function setPreviewDevice(device) {
+    previewDevice = device;
+    previewZoom = null;
+    const frame = $(".browser-frame");
+    frame.classList.toggle("desktop", device === "desktop");
+    frame.classList.toggle("mobile", device === "mobile");
+    $$("[data-preview-device]").forEach(button => {
+      const active = button.dataset.previewDevice === device;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    updatePreviewScale();
   }
 
   function getImageSource(image, index, forPreview) {
@@ -2844,6 +2876,21 @@ Review and adapt these sample terms to the network operator's actual practices a
     setPreviewThemeButton();
     updatePreview();
   });
+  $$("[data-preview-device]").forEach(button => {
+    button.addEventListener("click", () => setPreviewDevice(button.dataset.previewDevice));
+  });
+  ["out", "in"].forEach(direction => {
+    $(`#preview-zoom-${direction}`).addEventListener("click", () => {
+      const current = previewZoom ?? Math.min(1, $(".preview-canvas").clientWidth / (previewDevice === "desktop" ? 1024 : 390));
+      previewZoom = Math.max(0.25, Math.min(2, Math.round((current + (direction === "in" ? 0.1 : -0.1)) * 100) / 100));
+      updatePreviewScale();
+    });
+  });
+  $("#preview-zoom-fit").addEventListener("click", () => {
+    previewZoom = null;
+    updatePreviewScale();
+  });
+  new ResizeObserver(updatePreviewScale).observe($(".preview-canvas"));
   $("#thank-you-close").addEventListener("click", () => $("#thank-you-dialog").close());
   $("#thank-you-continue").addEventListener("click", () => $("#thank-you-dialog").close());
   $("#thank-you-dashboard").addEventListener("click", () => {

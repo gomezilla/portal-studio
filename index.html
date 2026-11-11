@@ -207,12 +207,12 @@
                   <div><strong>Portal header</strong><span>Show the title and welcome message</span></div>
                   <label class="switch"><input type="checkbox" data-field="showHeader" aria-label="Show portal header"><span></span></label>
                 </div>
+              </div>
+              <div class="content-wizard-step" data-content-step="1" hidden>
                 <div class="field-toggle">
                   <div><strong>Photo gallery</strong><span>Show the rotating image gallery</span></div>
                   <label class="switch"><input type="checkbox" data-field="showGallery" aria-label="Show photo gallery"><span></span></label>
                 </div>
-              </div>
-              <div class="content-wizard-step" data-content-step="1" hidden>
                 <p class="images-note">Use JPG, PNG, GIF, or WebP gallery images up to 1 MB each.</p>
                 <button class="button button-quiet add-image-button" id="add-gallery-image-button" type="button">＋ Add gallery image</button>
                 <input id="gallery-image-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
@@ -342,6 +342,16 @@
           <div class="preview-toolbar">
             <div class="preview-heading"><span class="live-indicator"></span><strong>Live preview</strong></div>
             <div class="preview-toolbar-actions">
+              <div class="preview-device-switch" role="group" aria-label="Preview device">
+                <button class="preview-device-button" type="button" data-preview-device="mobile" aria-pressed="false">Mobile</button>
+                <button class="preview-device-button active" type="button" data-preview-device="desktop" aria-pressed="true">Desktop</button>
+              </div>
+              <div class="preview-zoom" role="group" aria-label="Preview zoom">
+                <button type="button" id="preview-zoom-out" aria-label="Zoom out">−</button>
+                <output id="preview-zoom-value" aria-live="polite">100%</output>
+                <button type="button" id="preview-zoom-in" aria-label="Zoom in">+</button>
+                <button type="button" id="preview-zoom-fit" aria-label="Fit preview">Fit</button>
+              </div>
               <button class="theme-preview-button" id="theme-preview-button" type="button"><span aria-hidden="true">☼</span> Preview dark mode</button>
             </div>
           </div>

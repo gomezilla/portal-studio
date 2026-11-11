@@ -208,8 +208,14 @@ main { flex: 1; }
 .draft-autosave { color: #777687; font-size: 11px; }
 .guide-step-text { grid-column: 1 / -1; grid-row: 1; margin: 0; }
 .guide-image-slot .guide-image-thumb { grid-column: 2; grid-row: 2; }
-.preview-canvas { align-items: stretch; justify-content: flex-start; gap: 0; padding: 0; }
-.browser-frame.desktop { width: 100%; min-width: 800px; height: 100%; min-height: 600px; border: 0; border-radius: 0; box-shadow: none; }
+.preview-canvas { align-items: flex-start; justify-content: flex-start; gap: 0; padding: 0; }
+.browser-frame.desktop, .browser-frame.mobile { position: relative; flex: none; width: var(--scaled-width); height: var(--scaled-height); min-width: 0; min-height: 0; margin: 0 auto; border: 0; border-radius: 0; box-shadow: none; }
+.browser-frame iframe { position: absolute; top: 0; left: 0; width: var(--viewport-width); height: 800px; min-height: 0; transform: scale(var(--preview-scale)); transform-origin: top left; }
+.preview-zoom { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid #eae9ef; border-radius: 8px; background: #f7f6f9; }
+.preview-zoom button { padding: 4px 6px; border: 0; color: #777687; background: transparent; font-size: 11px; }
+.preview-zoom output { min-width: 34px; color: #777687; font-size: 10px; text-align: center; }
+.preview-toolbar { height: auto; min-height: 52px; gap: 8px; flex-wrap: wrap; padding-top: 6px; padding-bottom: 6px; }
+.preview-toolbar-actions { flex-wrap: wrap; }
 .preview-caption { padding: 10px; }
 .access-method-note { margin: 10px 0 14px; padding: 10px 11px; border: 1px solid #e8e2f5; border-radius: 8px; color: #777687; background: #faf9fc; font-size: 10px; line-height: 1.5; }
 .access-method-note strong { color: #554778; }

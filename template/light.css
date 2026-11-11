@@ -54,6 +54,9 @@ body {
 
 .header { margin: 0 0 18px; }
 .header-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.internet-status { display: inline-flex; flex: 0 0 auto; color: #9299a4; }
+.internet-status[data-online="true"] { color: #159b63; }
+.internet-status svg { width: 23px; height: 23px; }
 
 .portal-badge, .speed-live {
     display: inline-flex;

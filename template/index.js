@@ -212,6 +212,9 @@ Ajax.post(
                     window.authType = 15;
                     break;
                 case 11:
+                    globalConfig.hotspotTypes = globalConfig.hotspotTypes.slice().sort(function(a, b) {
+                        return (Number(b) === 3 ? 1 : 0) - (Number(a) === 3 ? 1 : 0);
+                    });
                     var hotspotSelector = document.getElementById("hotspot-selector");
                     var options = "";
                     for (var i = 0; i < globalConfig.hotspotTypes.length; i++) {
