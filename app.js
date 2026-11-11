@@ -172,8 +172,10 @@ Review and adapt these sample terms to the network operator's actual practices a
   let creditNotifications = [];
   let adminPendingRequests = [];
   let adminPendingUnlockRequests = [];
-  let readNotificationUserId = "";
   let readNotificationIds = new Set();
+  let dismissedNotificationIds = new Set();
+  let visibleNotificationItems = [];
+  let showAllNotifications = false;
   let adminViewingUser = null;
   let adminUserProjects = [];
   const remoteDraftIds = new Set();
@@ -187,6 +189,8 @@ Review and adapt these sample terms to the network operator's actual practices a
   let previewZoom = null;
   let previewMethods = new Set(["3"]);
   let passwordRecoveryPromptShown = false;
+  let usernameNeeded = false;
+  let lastActivitySentAt = 0;
   let contentWizardStep = 0;
   const templateAssets = new Map();
   let sizeCheckSequence = 0;
@@ -424,7 +428,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     if (!adminUsers.length) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 9;
+      cell.colSpan = 10;
       cell.textContent = "No users match these filters.";
       row.append(cell);
       body.append(row);
@@ -449,6 +453,8 @@ Review and adapt these sample terms to the network operator's actual practices a
       signedUp.textContent = formatDateTime(user.signed_up_at);
       const lastLogin = document.createElement("td");
       lastLogin.textContent = user.last_sign_in_at ? formatDateTime(user.last_sign_in_at) : "Never";
+      const lastActive = document.createElement("td");
+      lastActive.textContent = user.last_active_at ? formatDateTime(user.last_active_at) : "Not recorded";
       const tenure = document.createElement("td");
       tenure.textContent = durationLabel(user.signed_up_at);
       const idle = document.createElement("td");
@@ -484,7 +490,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       remove.addEventListener("click", () => removeAdminUser(user));
       actions.append(credits, lock, remove);
       action.append(actions);
-      row.append(email, templates, exports, exportsAllowed, signedUp, lastLogin, tenure, idle, action);
+      row.append(email, templates, exports, exportsAllowed, signedUp, lastLogin, lastActive, tenure, idle, action);
       body.append(row);
     });
   }
@@ -528,7 +534,7 @@ Review and adapt these sample terms to the network operator's actual practices a
         const title = document.createElement("strong");
         title.textContent = project.name || "Untitled Wi-Fi Portal";
         const edited = document.createElement("p");
-        edited.textContent = `Edited ${formatDate(project.updatedAt)}`;
+        edited.textContent = `Edited ${formatDateTime(project.updatedAt)}`;
         details.append(title, edited);
         const open = document.createElement("button");
         open.type = "button";
@@ -757,6 +763,7 @@ Review and adapt these sample terms to the network operator's actual practices a
 
   async function saveCurrentProject(silent = false) {
     if (!currentProject || (!OFFLINE_MODE && (!currentUser || !quota))) return false;
+    if (currentProject.locked) return true;
     window.clearTimeout(saveTimer);
     currentProject.name = ($("#project-name").value.trim() || "Untitled Wi-Fi Portal").slice(0, 70);
     currentProject.updatedAt = new Date().toISOString();
@@ -797,12 +804,18 @@ Review and adapt these sample terms to the network operator's actual practices a
       card.innerHTML = `<div class="card-preview" style="--card-color:${color}"><span class="card-pill"></span><span class="card-lines"></span></div>
         <div class="card-content"><div class="card-title-row"><h3></h3><span class="card-status">DRAFT</span></div>
         <p class="card-subtitle"></p><div class="card-bottom"><span class="card-date"></span>
-        <div class="card-actions"><button class="icon-button" data-action="duplicate" aria-label="Duplicate portal" title="Duplicate">⧉</button>
+        <div class="card-actions"><button class="icon-button" data-action="lock"></button><button class="icon-button" data-action="duplicate" aria-label="Duplicate portal" title="Duplicate">⧉</button>
         <button class="icon-button" data-action="edit" aria-label="Edit portal" title="Edit">↗</button>
         <button class="icon-button" data-action="delete" aria-label="Delete portal" title="Delete">×</button></div></div></div>`;
       card.querySelector("h3").textContent = project.name || "Untitled Wi-Fi Portal";
       card.querySelector(".card-subtitle").textContent = project.settings.headline || "No headline";
-      card.querySelector(".card-date").textContent = `Edited ${formatDate(project.updatedAt)}`;
+      card.querySelector(".card-date").textContent = `Edited ${formatDateTime(project.updatedAt)}`;
+      const lockButton = card.querySelector('[data-action="lock"]');
+      lockButton.textContent = project.locked ? "🔒" : "🔓";
+      lockButton.title = project.locked ? "Unlock portal" : "Lock portal";
+      lockButton.setAttribute("aria-label", lockButton.title);
+      card.querySelector('[data-action="delete"]').disabled = Boolean(project.locked);
+      card.querySelector('[data-action="edit"]').title = project.locked ? "View locked portal" : "Edit";
       card.dataset.projectId = project.id;
       card.querySelector(".card-preview").addEventListener("click", () => openProject(project.id));
       card.querySelectorAll("[data-action]").forEach(button => button.addEventListener("click", event => {
@@ -810,6 +823,7 @@ Review and adapt these sample terms to the network operator's actual practices a
         if (button.dataset.action === "edit") openProject(project.id);
         if (button.dataset.action === "duplicate") duplicateProject(project);
         if (button.dataset.action === "delete") deleteProject(project);
+        if (button.dataset.action === "lock") toggleProjectLock(project, button);
       }));
       card.querySelector(".card-content").addEventListener("dblclick", () => openProject(project.id));
       list.append(card);
@@ -868,56 +882,85 @@ Review and adapt these sample terms to the network operator's actual practices a
     renderNotifications();
   }
 
-  function loadReadNotificationState() {
-    const userId = currentUser?.id || "signed-out";
-    if (userId === readNotificationUserId) return;
-    readNotificationUserId = userId;
-    readNotificationIds = new Set();
-    if (userId === "signed-out") return;
-    try {
-      const saved = window.localStorage.getItem(`portal-studio-read-notifications:${userId}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (!Array.isArray(parsed) || parsed.some(id => typeof id !== "string")) {
-          throw new Error("Saved notification read state has an invalid format.");
-        }
-        readNotificationIds = new Set(parsed);
-      }
-    } catch (error) {
-      showToast(`Could not load notification read status: ${error.message}`, true);
+  async function fetchNotificationRows(queryFactory) {
+    const rows = [];
+    let offset = 0;
+    for (;;) {
+      const { data, error } = await queryFactory().range(offset, offset + 499);
+      if (error) throw error;
+      if (!data.length) return rows;
+      rows.push(...data);
+      offset += data.length;
     }
+  }
+
+  async function loadReadNotificationState() {
+    const userId = currentUser.id;
+    const key = `portal-studio-read-notifications:${userId}`;
+    const saved = window.localStorage.getItem(key);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.some(id => typeof id !== "string")) {
+        throw new Error("Saved notification read state has an invalid format.");
+      }
+      if (parsed.length) {
+        const { error } = await supabaseClient.from("portal_notification_state").upsert(
+          parsed.map(id => ({ user_id: userId, notification_id: id })),
+          { onConflict: "user_id,notification_id", ignoreDuplicates: true }
+        );
+        if (error) throw error;
+      }
+      window.localStorage.removeItem(key);
+    }
+    const data = await fetchNotificationRows(() => supabaseClient.from("portal_notification_state")
+      .select("notification_id,dismissed").eq("user_id", userId).order("notification_id"));
+    if (currentUser?.id !== userId) return;
+    readNotificationIds = new Set(data.map(row => row.notification_id));
+    dismissedNotificationIds = new Set(data.filter(row => row.dismissed).map(row => row.notification_id));
+  }
+
+  async function updateNotificationState(ids, dismissed = false) {
+    if (!currentUser || !ids.length) return;
+    const userId = currentUser.id;
+    const rows = ids.map(id => ({ user_id: userId, notification_id: id, dismissed }));
+    try {
+      const { error } = await supabaseClient.from("portal_notification_state").upsert(rows, {
+        onConflict: "user_id,notification_id", ignoreDuplicates: !dismissed
+      });
+      if (error) throw error;
+    } catch (error) {
+      showToast(`Could not update notifications: ${error.message}`, true);
+      return;
+    }
+    if (currentUser?.id !== userId) return;
+    ids.forEach(id => {
+      readNotificationIds.add(id);
+      if (dismissed) dismissedNotificationIds.add(id);
+    });
+    renderNotifications();
   }
 
   function markNotificationRead(id) {
     if (!id || readNotificationIds.has(id)) return;
-    readNotificationIds.add(id);
-    try {
-      if (currentUser) {
-        const savedIds = [...readNotificationIds].slice(-300);
-        window.localStorage.setItem(`portal-studio-read-notifications:${currentUser.id}`, JSON.stringify(savedIds));
-        readNotificationIds = new Set(savedIds);
-      }
-    } catch (error) {
-      showToast(`Could not save notification read status: ${error.message}`, true);
-    }
-    renderNotifications();
+    return updateNotificationState([id]);
   }
 
   function renderNotifications() {
     const list = $("#notification-list");
     if (!list) return;
-    loadReadNotificationState();
     list.replaceChildren();
     const items = [];
     if (isAdmin) {
       adminPendingRequests.forEach(request => items.push({
         id: `access:${request.id}:pending`,
+        date: request.created_at,
         title: `Access request from ${request.email}`,
         message: `${request.requested_templates} template and ${request.requested_exports} export credits requested · ${request.reason}`,
         action: "Review requests"
       }));
       adminPendingUnlockRequests.forEach(request => items.push({
         id: `unlock:${request.id}:pending`,
+        date: request.created_at,
         title: `Account unlock request from ${request.email}`,
         message: request.reason,
         action: "Review unlock requests"
@@ -927,12 +970,14 @@ Review and adapt these sample terms to the network operator's actual practices a
       if (request.status === "pending") {
         items.push({
           id: `access:${request.id}:${request.status}:${request.reviewed_at || ""}`,
+          date: request.created_at,
           title: "Access request pending",
           message: `Your request is waiting for administrator review. Requested: ${request.requested_templates} templates and ${request.requested_exports} exports.`
         });
       } else {
         items.push({
           id: `access:${request.id}:${request.status}:${request.reviewed_at || ""}`,
+          date: request.reviewed_at || request.created_at,
           title: `Access request ${request.status}`,
           message: request.status === "approved"
             ? `Approved: ${request.approved_templates} additional templates and ${request.approved_exports} additional exports. Reviewed by Admin.`
@@ -942,6 +987,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     });
     userUnlockRequests.forEach(request => items.push({
       id: `unlock:${request.id}:${request.status}:${request.reviewed_at || ""}`,
+      date: request.reviewed_at || request.created_at,
       title: `Account unlock request ${request.status}`,
       message: request.status === "pending"
         ? "Your justification is waiting for administrator review."
@@ -951,22 +997,29 @@ Review and adapt these sample terms to the network operator's actual practices a
     }));
     creditNotifications.forEach(entry => items.push({
       id: `credit:${entry.id}`,
+      date: entry.created_at,
       title: "Additional credits granted",
       message: `An administrator added ${entry.template_credits} template and ${entry.export_credits} export credits.`
     }));
+    visibleNotificationItems = items.filter(item => !dismissedNotificationIds.has(item.id))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const count = $("#notification-count");
-    const unreadCount = items.filter(item => !readNotificationIds.has(item.id)).length;
+    const unreadCount = visibleNotificationItems.filter(item => !readNotificationIds.has(item.id)).length;
     count.hidden = unreadCount === 0;
     count.textContent = unreadCount > 9 ? "9+" : String(unreadCount);
     $("#notifications-button").setAttribute("aria-label", `Notifications${unreadCount ? `, ${unreadCount} unread updates` : ""}`);
-    if (!items.length) {
+    $("#notifications-read-all").disabled = !unreadCount;
+    $("#notifications-clear").disabled = !visibleNotificationItems.length;
+    $("#notifications-show-all").hidden = visibleNotificationItems.length <= 5;
+    $("#notifications-show-all").textContent = showAllNotifications ? "Show fewer" : "Show all";
+    if (!visibleNotificationItems.length) {
       const empty = document.createElement("p");
       empty.className = "notification-empty";
       empty.textContent = currentUser ? "You're all caught up." : "Sign in to see account notifications.";
       list.append(empty);
       return;
     }
-    items.forEach(item => {
+    (showAllNotifications ? visibleNotificationItems : visibleNotificationItems.slice(0, 5)).forEach(item => {
       const row = document.createElement("article");
       const isRead = readNotificationIds.has(item.id);
       row.className = `notification-item${isRead ? " is-read" : ""}`;
@@ -987,7 +1040,7 @@ Review and adapt these sample terms to the network operator's actual practices a
         action.className = "text-button";
         action.textContent = item.action;
         action.addEventListener("click", async () => {
-          markNotificationRead(item.id);
+          await markNotificationRead(item.id);
           $("#notifications-panel").hidden = true;
           $("#notifications-button").setAttribute("aria-expanded", "false");
           let target = $("#admin-requests");
@@ -1009,40 +1062,35 @@ Review and adapt these sample terms to the network operator's actual practices a
       return;
     }
     try {
-      const [requestsResult, creditsResult, unlocksResult] = await Promise.all([
-        supabaseClient.from("portal_access_requests")
+      await loadReadNotificationState();
+      const [requests, credits, unlocks] = await Promise.all([
+        fetchNotificationRows(() => supabaseClient.from("portal_access_requests")
           .select("id,status,created_at,reviewed_at,reviewed_by,reason,requested_templates,requested_exports,approved_templates,approved_exports")
-          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(30),
-        supabaseClient.from("portal_access_audit_log")
+          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).order("id")),
+        fetchNotificationRows(() => supabaseClient.from("portal_access_audit_log")
           .select("id,template_credits,export_credits,created_at")
           .eq("user_id", currentUser.id).eq("action", "credits_granted")
-          .order("created_at", { ascending: false }).limit(30),
-        supabaseClient.from("portal_unlock_requests")
+          .order("created_at", { ascending: false }).order("id")),
+        fetchNotificationRows(() => supabaseClient.from("portal_unlock_requests")
           .select("id,status,created_at,reviewed_at,reason")
-          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(30)
+          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).order("id"))
       ]);
-      const { data: requests, error: requestsError } = requestsResult;
-      if (requestsError) throw requestsError;
-      if (creditsResult.error) throw creditsResult.error;
-      if (unlocksResult.error) throw unlocksResult.error;
-      userRequests = requests || [];
-      creditNotifications = creditsResult.data || [];
-      userUnlockRequests = unlocksResult.data || [];
+      userRequests = requests;
+      creditNotifications = credits;
+      userUnlockRequests = unlocks;
       pendingRequest = userRequests.find(request => request.status === "pending") || null;
       pendingUnlockRequest = userUnlockRequests.find(request => request.status === "pending") || null;
       if (isAdmin) {
-        const [pendingResult, unlocksPendingResult] = await Promise.all([
-          supabaseClient.from("portal_access_requests")
+        const [pending, unlocksPending] = await Promise.all([
+          fetchNotificationRows(() => supabaseClient.from("portal_access_requests")
             .select("id,email,reason,requested_templates,requested_exports,created_at")
-            .eq("status", "pending").order("created_at", { ascending: true }),
-          supabaseClient.from("portal_unlock_requests")
+            .eq("status", "pending").order("created_at", { ascending: true }).order("id")),
+          fetchNotificationRows(() => supabaseClient.from("portal_unlock_requests")
             .select("id,email,reason,created_at")
-            .eq("status", "pending").order("created_at", { ascending: true })
+            .eq("status", "pending").order("created_at", { ascending: true }).order("id"))
         ]);
-        if (pendingResult.error) throw pendingResult.error;
-        if (unlocksPendingResult.error) throw unlocksPendingResult.error;
-        adminPendingRequests = pendingResult.data || [];
-        adminPendingUnlockRequests = unlocksPendingResult.data || [];
+        adminPendingRequests = pending;
+        adminPendingUnlockRequests = unlocksPending;
       }
       updateAccountControls();
     } catch (error) {
@@ -1053,32 +1101,33 @@ Review and adapt these sample terms to the network operator's actual practices a
   async function loadAccountData() {
     if (!currentUser || !supabaseClient) return;
     try {
-      const [draftsResult, quotaResult, adminResult, requestResult, creditsResult, unlocksResult] = await Promise.all([
+      await loadReadNotificationState();
+      const [draftsResult, quotaResult, adminResult, requests, credits, unlocks, profileResult] = await Promise.all([
         supabaseClient.from("portal_drafts").select("id,user_id,name,payload,updated_at").eq("user_id", currentUser.id).order("updated_at", { ascending: false }),
         supabaseClient.rpc("get_my_portal_quota"),
         supabaseClient.rpc("is_portal_admin"),
-        supabaseClient.from("portal_access_requests")
+        fetchNotificationRows(() => supabaseClient.from("portal_access_requests")
           .select("id,status,created_at,reviewed_at,reviewed_by,reason,requested_templates,requested_exports,approved_templates,approved_exports")
-          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(30),
-        supabaseClient.from("portal_access_audit_log")
+          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).order("id")),
+        fetchNotificationRows(() => supabaseClient.from("portal_access_audit_log")
           .select("id,template_credits,export_credits,created_at")
           .eq("user_id", currentUser.id).eq("action", "credits_granted")
-          .order("created_at", { ascending: false }).limit(30),
-        supabaseClient.from("portal_unlock_requests")
+          .order("created_at", { ascending: false }).order("id")),
+        fetchNotificationRows(() => supabaseClient.from("portal_unlock_requests")
           .select("id,status,created_at,reviewed_at,reason")
-          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(30)
+          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).order("id")),
+        supabaseClient.from("portal_profiles").select("username").eq("user_id", currentUser.id).single()
       ]);
       if (draftsResult.error) throw draftsResult.error;
       if (quotaResult.error) throw quotaResult.error;
       if (adminResult.error) throw adminResult.error;
-      if (requestResult.error) throw requestResult.error;
-      if (creditsResult.error) throw creditsResult.error;
-      if (unlocksResult.error) throw unlocksResult.error;
+      if (profileResult.error) throw profileResult.error;
+      usernameNeeded = !profileResult.data.username;
       quota = quotaResult.data?.[0] || null;
       isAdmin = adminResult.data === true;
-      userRequests = requestResult.data || [];
-      creditNotifications = creditsResult.data || [];
-      userUnlockRequests = unlocksResult.data || [];
+      userRequests = requests;
+      creditNotifications = credits;
+      userUnlockRequests = unlocks;
       pendingRequest = userRequests.find(request => request.status === "pending") || null;
       pendingUnlockRequest = userUnlockRequests.find(request => request.status === "pending") || null;
       remoteDraftIds.clear();
@@ -1099,6 +1148,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       if (isAdmin) {
         await Promise.all([renderAdminRequests(), renderAdminUnlockRequests(), refreshAdminDashboard()]);
       }
+      if (!passwordRecoveryCallback && !$("#auth-dialog").open) showUsernamePrompt();
     } catch (error) {
       quota = null;
       window.portalStudioSetupError = `Account storage is not ready: ${error.message}. Run supabase/schema.sql in the Supabase SQL Editor and complete the setup steps in README.`;
@@ -1208,10 +1258,12 @@ Review and adapt these sample terms to the network operator's actual practices a
   async function renderAdminRequests() {
     const list = $("#admin-request-list");
     list.replaceChildren();
-    const { data, error } = await supabaseClient.from("portal_access_requests")
-      .select("id,email,reason,requested_templates,requested_exports,created_at")
-      .eq("status", "pending").order("created_at", { ascending: true });
-    if (error) {
+    let data;
+    try {
+      data = await fetchNotificationRows(() => supabaseClient.from("portal_access_requests")
+        .select("id,email,reason,requested_templates,requested_exports,created_at")
+        .eq("status", "pending").order("created_at", { ascending: true }).order("id"));
+    } catch (error) {
       showToast(`Could not load access requests: ${error.message}`, true);
       return;
     }
@@ -1244,10 +1296,12 @@ Review and adapt these sample terms to the network operator's actual practices a
 
   async function renderAdminUnlockRequests() {
     const list = $("#admin-unlock-request-list");
-    const { data, error } = await supabaseClient.from("portal_unlock_requests")
-      .select("id,email,reason,created_at")
-      .eq("status", "pending").order("created_at", { ascending: true });
-    if (error) {
+    let data;
+    try {
+      data = await fetchNotificationRows(() => supabaseClient.from("portal_unlock_requests")
+        .select("id,email,reason,created_at")
+        .eq("status", "pending").order("created_at", { ascending: true }).order("id"));
+    } catch (error) {
       showToast(`Could not load account unlock requests: ${error.message}`, true);
       return;
     }
@@ -1402,12 +1456,6 @@ Review and adapt these sample terms to the network operator's actual practices a
     await loadAccountData();
   }
 
-  function formatDate(value) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "recently";
-    return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
-  }
-
   function formatDateTime(value) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "—";
@@ -1503,6 +1551,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     }
     const duplicate = JSON.parse(JSON.stringify(project));
     duplicate.id = makeId();
+    duplicate.locked = false;
     duplicate.name = `${project.name || "Wi-Fi Portal"} copy`.slice(0, 70);
     duplicate.createdAt = new Date().toISOString();
     duplicate.updatedAt = duplicate.createdAt;
@@ -1518,7 +1567,26 @@ Review and adapt these sample terms to the network operator's actual practices a
     }
   }
 
+  async function toggleProjectLock(project, button) {
+    button.disabled = true;
+    const updated = { ...project, locked: !project.locked };
+    try {
+      if (OFFLINE_MODE) await storeLocalProject(updated);
+      else await persistCloudProject(updated);
+      Object.assign(project, { locked: updated.locked, updatedAt: updated.updatedAt });
+      renderDashboard();
+      showToast(updated.locked ? "Portal locked against editing and deletion." : "Portal unlocked.");
+    } catch (error) {
+      button.disabled = false;
+      showToast(`Could not change portal lock: ${error.message}`, true);
+    }
+  }
+
   async function deleteProject(project) {
+    if (project.locked) {
+      showToast("Unlock this portal before deleting it.", true);
+      return;
+    }
     if (!window.confirm(`Delete "${project.name || "Untitled Wi-Fi Portal"}"? This cannot be undone.`)) return;
     try {
       if (OFFLINE_MODE) {
@@ -1559,6 +1627,10 @@ Review and adapt these sample terms to the network operator's actual practices a
     document.body.classList.add("editor-active");
     $("#top-save-button").hidden = false;
     $("#project-name").value = currentProject.name;
+    $("#project-name").readOnly = Boolean(currentProject.locked);
+    $(".settings-panel").inert = Boolean(currentProject.locked);
+    $(".draft-autosave").textContent = currentProject.locked ? "Locked · read-only" : "Draft autosaves";
+    $("#top-save-button").disabled = Boolean(currentProject.locked);
     setActiveTab($("#style-tab"));
     previewMethods = new Set(["3"]);
     $$("[data-preview-method]").forEach(input => { input.checked = previewMethods.has(input.dataset.previewMethod); });
@@ -1626,9 +1698,29 @@ Review and adapt these sample terms to the network operator's actual practices a
     $("#auth-password").autocomplete = signUp || recovery ? "new-password" : "current-password";
     $("#auth-password").setAttribute("minlength", signUp || recovery ? "8" : "1");
     $("#auth-reset").hidden = signUp || recovery;
+    $("#auth-username-field").hidden = !signUp;
+    $("#auth-username").required = signUp;
+    $("#auth-username").disabled = !signUp;
     $("#auth-message").textContent = "";
     $("#auth-message").classList.remove("warning");
     $("#auth-form").dataset.mode = mode;
+  }
+
+  function showUsernamePrompt() {
+    if (usernameNeeded && currentUser && !$("#auth-dialog").open && !$("#username-dialog").open) {
+      $("#username-dialog").showModal();
+    }
+  }
+
+  async function recordActivity() {
+    if (!currentUser || !supabaseClient || Date.now() - lastActivitySentAt < 300_000) return;
+    lastActivitySentAt = Date.now();
+    try {
+      const { error } = await supabaseClient.rpc("record_portal_activity");
+      if (error) throw error;
+    } catch (error) {
+      showToast(`Could not record account activity: ${error.message}`, true);
+    }
   }
 
   function showPasswordRecoveryPrompt(session) {
@@ -2509,6 +2601,7 @@ Review and adapt these sample terms to the network operator's actual practices a
             renderNotifications();
             if ($("#auth-form").dataset.mode !== "recovery") $("#auth-dialog").close();
             await loadAccountData();
+            await recordActivity();
             if (pendingCreateAfterSignIn) {
               pendingCreateAfterSignIn = false;
               await createProject();
@@ -2529,8 +2622,12 @@ Review and adapt these sample terms to the network operator's actual practices a
           isAdmin = false;
           pendingRequest = null;
           pendingUnlockRequest = null;
-          readNotificationUserId = "";
           readNotificationIds = new Set();
+          dismissedNotificationIds = new Set();
+          showAllNotifications = false;
+          usernameNeeded = false;
+          lastActivitySentAt = 0;
+          if ($("#username-dialog").open) $("#username-dialog").close();
           remoteDraftIds.clear();
           editorView.hidden = true;
           dashboardView.hidden = false;
@@ -2542,7 +2639,10 @@ Review and adapt these sample terms to the network operator's actual practices a
       const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
       if (sessionError) throw sessionError;
       currentUser = sessionData.session?.user || null;
-      if (currentUser) await loadAccountData();
+      if (currentUser) {
+        await loadAccountData();
+        await recordActivity();
+      }
       else renderDashboard();
       if (passwordRecoveryCallback) {
         if (sessionData.session) {
@@ -2587,6 +2687,16 @@ Review and adapt these sample terms to the network operator's actual practices a
   $("#notifications-close").addEventListener("click", () => {
     $("#notifications-panel").hidden = true;
     $("#notifications-button").setAttribute("aria-expanded", "false");
+  });
+  $("#notifications-read-all").addEventListener("click", () => updateNotificationState(
+    visibleNotificationItems.filter(item => !readNotificationIds.has(item.id)).map(item => item.id)
+  ));
+  $("#notifications-clear").addEventListener("click", () => updateNotificationState(
+    visibleNotificationItems.map(item => item.id), true
+  ));
+  $("#notifications-show-all").addEventListener("click", () => {
+    showAllNotifications = !showAllNotifications;
+    renderNotifications();
   });
   document.addEventListener("click", event => {
     if (!event.target.closest(".topbar-menu")) {
@@ -2640,6 +2750,26 @@ Review and adapt these sample terms to the network operator's actual practices a
     if (error) showToast(`Could not sign out: ${error.message}`, true);
   });
   $("#auth-close").addEventListener("click", () => $("#auth-dialog").close());
+  $("#auth-dialog").addEventListener("close", showUsernamePrompt);
+  $("#username-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = $("#username-submit");
+    const message = $("#username-message");
+    button.disabled = true;
+    message.textContent = "Saving username…";
+    try {
+      const { error } = await supabaseClient.rpc("set_portal_username", { p_username: $("#username-input").value.trim() });
+      if (error) throw error;
+      usernameNeeded = false;
+      $("#username-dialog").close();
+      showToast("Username saved.");
+    } catch (error) {
+      message.textContent = `Could not save username: ${error.message}`;
+    } finally {
+      button.disabled = false;
+    }
+  });
+  ["pointerdown", "keydown"].forEach(eventName => document.addEventListener(eventName, recordActivity, { passive: true }));
   $("#auth-mode-toggle").addEventListener("click", () => {
     setAuthMode($("#auth-form").dataset.mode === "signup" ? "signin" : "signup");
   });
@@ -2661,7 +2791,7 @@ Review and adapt these sample terms to the network operator's actual practices a
           ? await supabaseClient.auth.signUp({
             email,
             password,
-            options: { data: { portal_device_id: getPortalDeviceId() } }
+            options: { data: { portal_device_id: getPortalDeviceId(), portal_username: $("#auth-username").value.trim() } }
           })
           : await supabaseClient.auth.signInWithPassword({ email, password });
       if (error) throw error;
@@ -2688,7 +2818,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       message.textContent = deviceLimit
         ? "This device has reached its limit of two Portal Studio accounts."
         : accountCreationError
-          ? `Could not create the account. Account creation is limited to two accounts per browser device; if you have not reached that limit, contact the administrator. (${errorText})`
+          ? `Could not create the account. The username may already be in use, or this device may have reached its two-account limit. If neither applies, contact the administrator. (${errorText})`
         : rateLimited
         ? "Supabase’s email rate limit has been reached. Wait before trying again. For reliable delivery, configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings."
         : invalidCredentials

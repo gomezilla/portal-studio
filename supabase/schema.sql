@@ -32,6 +32,76 @@ create table if not exists public.portal_drafts (
 
 create index if not exists portal_drafts_user_id_idx on public.portal_drafts(user_id);
 
+create table if not exists public.portal_notification_state (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  notification_id text not null check (length(notification_id) <= 200),
+  dismissed boolean not null default false,
+  primary key (user_id, notification_id)
+);
+alter table public.portal_notification_state enable row level security;
+drop policy if exists "Users manage own notification state" on public.portal_notification_state;
+create policy "Users manage own notification state" on public.portal_notification_state
+  for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+grant select, insert, update, delete on public.portal_notification_state to authenticated;
+
+create table if not exists public.portal_profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  username text check (username is null or username ~ '^[A-Za-z0-9_]{3,30}$'),
+  last_active_at timestamptz
+);
+create unique index if not exists portal_profiles_username_unique
+  on public.portal_profiles (lower(username)) where username is not null;
+alter table public.portal_profiles enable row level security;
+drop policy if exists "Users read own portal profile" on public.portal_profiles;
+create policy "Users read own portal profile" on public.portal_profiles
+  for select to authenticated using (user_id = auth.uid());
+grant select on public.portal_profiles to authenticated;
+
+create or replace function public.create_portal_profile()
+returns trigger language plpgsql security definer set search_path = public, auth as $$
+declare requested_username text := nullif(trim(new.raw_user_meta_data ->> 'portal_username'), '');
+begin
+  if requested_username is not null and requested_username !~ '^[A-Za-z0-9_]{3,30}$' then
+    raise exception 'Username must be 3 to 30 letters, numbers, or underscores.';
+  end if;
+  insert into public.portal_profiles(user_id, username) values (new.id, requested_username);
+  return new;
+end;
+$$;
+drop trigger if exists portal_create_profile on auth.users;
+create trigger portal_create_profile after insert on auth.users
+  for each row execute function public.create_portal_profile();
+insert into public.portal_profiles(user_id)
+select id from auth.users on conflict (user_id) do nothing;
+
+create or replace function public.set_portal_username(p_username text)
+returns void language plpgsql security definer set search_path = public, auth as $$
+begin
+  if auth.uid() is null then raise exception 'Sign in is required.'; end if;
+  if trim(coalesce(p_username, '')) !~ '^[A-Za-z0-9_]{3,30}$' then
+    raise exception 'Username must be 3 to 30 letters, numbers, or underscores.';
+  end if;
+  insert into public.portal_profiles(user_id, username) values (auth.uid(), trim(p_username))
+  on conflict (user_id) do update set username = excluded.username;
+exception when unique_violation then
+  raise exception 'This username is already in use.';
+end;
+$$;
+
+create or replace function public.record_portal_activity()
+returns void language plpgsql security definer set search_path = public, auth as $$
+begin
+  if auth.uid() is null then raise exception 'Sign in is required.'; end if;
+  insert into public.portal_profiles(user_id, last_active_at) values (auth.uid(), now())
+  on conflict (user_id) do update set last_active_at = excluded.last_active_at
+    where portal_profiles.last_active_at is null or portal_profiles.last_active_at < now() - interval '1 minute';
+end;
+$$;
+revoke all on function public.create_portal_profile() from public, anon, authenticated;
+revoke all on function public.set_portal_username(text) from public, anon;
+revoke all on function public.record_portal_activity() from public, anon;
+grant execute on function public.set_portal_username(text), public.record_portal_activity() to authenticated;
+
 create table if not exists public.portal_access_requests (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -674,6 +744,7 @@ begin
            coalesce(u.email, '')::text as email,
            u.created_at::timestamptz as signed_up_at,
            u.last_sign_in_at::timestamptz as last_sign_in_at,
+           p.last_active_at::timestamptz as last_active_at,
            count(d.id)::bigint as templates_saved,
            coalesce(q.exports_used, 0)::integer as exports_used,
            case
@@ -692,8 +763,9 @@ begin
     from auth.users u
     left join public.portal_drafts d on d.user_id = u.id
     left join public.portal_quotas q on q.user_id = u.id
+    left join public.portal_profiles p on p.user_id = u.id
     group by u.id, u.email, u.created_at, u.last_sign_in_at, q.exports_used, q.extra_exports,
-             q.is_locked, q.lock_reason
+             q.is_locked, q.lock_reason, p.last_active_at
   ),
   filtered as (
     select *
