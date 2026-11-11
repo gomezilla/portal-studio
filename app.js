@@ -1575,10 +1575,15 @@ Review and adapt these sample terms to the network operator's actual practices a
       else await persistCloudProject(updated);
       Object.assign(project, { locked: updated.locked, updatedAt: updated.updatedAt });
       renderDashboard();
+      if (currentProject === project && !editorView.hidden) {
+        updateEditorLockState();
+        if (!project.locked) $("#project-name").focus();
+      }
       showToast(updated.locked ? "Portal locked against editing and deletion." : "Portal unlocked.");
     } catch (error) {
-      button.disabled = false;
       showToast(`Could not change portal lock: ${error.message}`, true);
+    } finally {
+      button.disabled = false;
     }
   }
 
@@ -1620,6 +1625,15 @@ Review and adapt these sample terms to the network operator's actual practices a
     openEditor();
   }
 
+  function updateEditorLockState() {
+    const locked = Boolean(currentProject.locked);
+    $("#project-name").readOnly = locked;
+    $(".settings-panel").inert = locked;
+    $(".draft-autosave").textContent = locked ? "Locked · read-only" : "Draft autosaves";
+    $("#top-save-button").disabled = locked;
+    $("#editor-unlock-button").hidden = !locked;
+  }
+
   function openEditor() {
     dashboardView.hidden = true;
     adminDashboardView.hidden = true;
@@ -1627,10 +1641,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     document.body.classList.add("editor-active");
     $("#top-save-button").hidden = false;
     $("#project-name").value = currentProject.name;
-    $("#project-name").readOnly = Boolean(currentProject.locked);
-    $(".settings-panel").inert = Boolean(currentProject.locked);
-    $(".draft-autosave").textContent = currentProject.locked ? "Locked · read-only" : "Draft autosaves";
-    $("#top-save-button").disabled = Boolean(currentProject.locked);
+    updateEditorLockState();
     setActiveTab($("#style-tab"));
     previewMethods = new Set(["3"]);
     $$("[data-preview-method]").forEach(input => { input.checked = previewMethods.has(input.dataset.previewMethod); });
@@ -2988,6 +2999,9 @@ Review and adapt these sample terms to the network operator's actual practices a
     showDashboard();
   });
   $("#back-button").addEventListener("click", showDashboard);
+  $("#editor-unlock-button").addEventListener("click", event => {
+    if (currentProject?.locked) toggleProjectLock(currentProject, event.currentTarget);
+  });
   $("#top-save-button").addEventListener("click", () => saveCurrentProject());
   $("#export-button").addEventListener("click", exportProject);
   $("#project-name").addEventListener("input", () => {
