@@ -91,6 +91,11 @@
       "3. Enter your voucher code and tap Connect to Wi-Fi."
     ],
     accessStyle: "dropdown",
+    accessLabelVoucher: "Voucher",
+    accessLabelLocal: "Account",
+    accessLabelSms: "SMS Access",
+    accessLabelRadius: "RADIUS Access",
+    accessLabelForm: "Form Auth",
     plansStyle: "dropdown",
     guideStyle: "dropdown",
     termsText: `By using this Wi-Fi service, you agree to use it only for lawful purposes and to follow these terms.
@@ -180,6 +185,7 @@ Review and adapt these sample terms to the network operator's actual practices a
   let previewThemeOverride = null;
   let previewDevice = "desktop";
   let previewZoom = null;
+  let previewMethods = new Set(["3"]);
   let passwordRecoveryPromptShown = false;
   let contentWizardStep = 0;
   const templateAssets = new Map();
@@ -1554,6 +1560,8 @@ Review and adapt these sample terms to the network operator's actual practices a
     $("#top-save-button").hidden = false;
     $("#project-name").value = currentProject.name;
     setActiveTab($("#style-tab"));
+    previewMethods = new Set(["3"]);
+    $$("[data-preview-method]").forEach(input => { input.checked = previewMethods.has(input.dataset.previewMethod); });
     setContentWizardStep(0);
     renderFields();
     syncAccent();
@@ -1667,11 +1675,11 @@ Review and adapt these sample terms to the network operator's actual practices a
     $$("[data-content-step]").forEach(panel => {
       panel.hidden = Number(panel.dataset.contentStep) !== contentWizardStep;
     });
-    $("#content-panel .step-number").textContent = `0${contentWizardStep + 1}`;
+    $("#content-panel .step-number").textContent = `0${contentWizardStep + 2}`;
     $("#content-step-title").textContent = titles[contentWizardStep];
     $("#content-step-description").textContent = descriptions[contentWizardStep];
-    $("#content-step-count").textContent = `Step ${contentWizardStep + 1} of ${titles.length}`;
-    $("#content-step-back").disabled = contentWizardStep === 0;
+    $("#content-step-count").textContent = `Step ${contentWizardStep + 2} of ${titles.length + 1}`;
+    $("#content-step-back").disabled = false;
     $("#content-step-next").textContent = contentWizardStep === titles.length - 1 ? "Done" : "Next";
   }
 
@@ -2036,25 +2044,25 @@ Review and adapt these sample terms to the network operator's actual practices a
       doc.body.dataset.preview = "true";
       const scripts = doc.querySelectorAll("script");
       scripts.forEach(script => script.remove());
-      const voucher = query("#input-voucher");
-      if (voucher) voucher.style.display = "block";
       const hotspotSection = query("#hotspot-section");
-      hotspotSection.style.display = "block";
+      hotspotSection.style.display = previewMethods.size > 1 ? "block" : "none";
       const previewSelector = query("#hotspot-selector");
-      [["3", "Voucher"], ["5", "Account"]].forEach(([value, label]) => {
+      const methods = [["3", "accessLabelVoucher"], ["5", "accessLabelLocal"], ["6", "accessLabelSms"], ["8", "accessLabelRadius"], ["2", "accessLabelForm"]]
+        .filter(([value]) => previewMethods.has(value));
+      methods.forEach(([value, key]) => {
         const option = doc.createElement("option");
         option.value = value;
-        option.textContent = label;
+        option.textContent = typeof settings[key] === "string" && settings[key].trim() ? settings[key] : DEFAULTS[key];
         previewSelector.append(option);
       });
       previewSelector.parentElement.hidden = settings.accessStyle === "tabs";
       const previewTabs = query("#hotspot-tabs");
       previewTabs.hidden = settings.accessStyle !== "tabs";
-      [["3", "Voucher"], ["5", "Account"]].forEach(([value, label], index) => {
+      methods.forEach(([value], index) => {
         const button = doc.createElement("button");
         button.type = "button";
         button.dataset.type = value;
-        button.textContent = label;
+        button.textContent = previewSelector.options[index].textContent;
         button.classList.toggle("active", index === 0);
         button.setAttribute("aria-pressed", String(index === 0));
         previewTabs.append(button);
@@ -2074,9 +2082,10 @@ Review and adapt these sample terms to the network operator's actual practices a
           var panel=button.nextElementSibling;var open=button.classList.toggle("active");button.setAttribute("aria-expanded",String(open));panel.style.display=open?"block":"none";
         });});
         document.getElementById("info-dialog-close").addEventListener("click",function(){document.getElementById("info-dialog").close();});
-        function access(type){document.getElementById("input-voucher").style.display=type==="3"?"block":"none";document.getElementById("input-user").style.display=type==="5"?"block":"none";document.getElementById("input-password").style.display=type==="5"?"block":"none";document.querySelectorAll("#hotspot-tabs button").forEach(function(button){var selected=button.dataset.type===type;button.classList.toggle("active",selected);button.setAttribute("aria-pressed",String(selected));});}
+        function access(type){document.getElementById("input-voucher").style.display=type==="3"?"block":"none";document.getElementById("input-user").style.display=["5","8","2"].includes(type)?"block":"none";document.getElementById("input-password").style.display=["5","8","2"].includes(type)?"block":"none";["input-phone-num","input-phone-number","input-verify-code"].forEach(function(id){document.getElementById(id).style.display=type==="6"?"block":"none";});document.querySelectorAll("#hotspot-tabs button").forEach(function(button){var selected=button.dataset.type===type;button.classList.toggle("active",selected);button.setAttribute("aria-pressed",String(selected));});}
         document.getElementById("hotspot-selector").addEventListener("change",function(event){access(event.target.value);});
         document.querySelectorAll("#hotspot-tabs button").forEach(function(button){button.addEventListener("click",function(){access(button.dataset.type);});});
+        access(document.getElementById("hotspot-selector").value);
         function prompt(message,isError){var dialog=document.getElementById("oper-prompt");dialog.dataset.kind=isError?"error":"success";document.getElementById("oper-prompt-title").textContent=isError?"Unable to connect":"Success";document.getElementById("oper-prompt-icon").textContent=isError?"!":"✓";document.getElementById("oper-prompt-close").textContent=isError?"Retry":"OK";document.getElementById("oper-prompt-message").textContent=message;if(!dialog.open)dialog.showModal();}
         var terms=document.getElementById("terms-acceptance"),check=document.getElementById("terms-checkbox");
         function requireTerms(){if(!terms||terms.style.display==="none"||!check||check.checked)return true;prompt("Please agree to the Terms of Service before connecting to Wi-Fi.",true);check.focus();return false;}
@@ -2119,6 +2128,11 @@ Review and adapt these sample terms to the network operator's actual practices a
     applySettingsToDocument(doc, getPreviewThemeMode(), true);
     previewFrame.srcdoc = `<!doctype html>${doc.documentElement.outerHTML}`;
   }
+
+  previewFrame.addEventListener("load", () => {
+    const body = previewFrame.contentDocument?.body;
+    if (body) $(".preview-canvas").style.background = previewFrame.contentWindow.getComputedStyle(body).background;
+  });
 
   function updatePreviewScale() {
     const canvas = $(".preview-canvas");
@@ -2209,6 +2223,15 @@ Review and adapt these sample terms to the network operator's actual practices a
       .replace(/\u2028/g, "\\u2028")
       .replace(/\u2029/g, "\\u2029");
     messagesScript.textContent = `window.portalStudioErrorMessages=${messagesJson};`;
+    const labels = {
+      3: currentProject.settings.accessLabelVoucher,
+      5: currentProject.settings.accessLabelLocal,
+      6: currentProject.settings.accessLabelSms,
+      8: currentProject.settings.accessLabelRadius,
+      2: currentProject.settings.accessLabelForm
+    };
+    const labelsJson = JSON.stringify(labels).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+    messagesScript.textContent += `window.portalStudioAccessLabels=${labelsJson};`;
     const authScript = doc.querySelector('script[src="index.js"]');
     if (!authScript) throw new Error("The template authentication script is missing.");
     authScript.before(messagesScript);
@@ -2757,7 +2780,19 @@ Review and adapt these sample terms to the network operator's actual practices a
       showToast(`Could not load users: ${error.message}`, true);
     }
   });
-  $("#content-step-back").addEventListener("click", () => setContentWizardStep(contentWizardStep - 1));
+  $("#style-step-next").addEventListener("click", () => {
+    setContentWizardStep(0);
+    setActiveTab($("#content-tab"));
+  });
+  $("#content-step-back").addEventListener("click", () => {
+    if (contentWizardStep === 0) setActiveTab($("#style-tab"));
+    else setContentWizardStep(contentWizardStep - 1);
+  });
+  $$("[data-preview-method]").forEach(input => input.addEventListener("change", () => {
+    if (input.checked) previewMethods.add(input.dataset.previewMethod);
+    else previewMethods.delete(input.dataset.previewMethod);
+    updatePreview();
+  }));
   $("#content-step-next").addEventListener("click", () => {
     if (contentWizardStep === 6) setActiveTab($("#messages-tab"));
     else setContentWizardStep(contentWizardStep + 1);

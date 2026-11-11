@@ -287,6 +287,7 @@ body {
 .secondary-label { margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 500; }
 .arrow { width: 8px; height: 8px; flex: 0 0 auto; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); transition: transform 0.18s ease; }
 .collapsible.active .arrow { transform: rotate(225deg); }
+.collapsible[data-presentation="prompt"] .arrow { display: none; }
 .content { display: none; overflow: hidden; padding: 13px 2px 2px; }
 .content p { margin: 0 0 11px; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .content strong { color: var(--text); }

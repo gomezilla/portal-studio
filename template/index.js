@@ -25,11 +25,18 @@ var originUrl = getQueryStringKey("originUrl");
 var previewSite = getQueryStringKey("previewSite");
 
 var hotspotMap = {
+    2: "Form Auth",
     3: "Voucher",
     5: "Account",
     6: "SMS Access",
     8: "RADIUS Access"
 };
+if (window.portalStudioAccessLabels) {
+    Object.keys(hotspotMap).forEach(function(type) {
+        var label = window.portalStudioAccessLabels[type];
+        if (typeof label === "string" && label.trim()) hotspotMap[type] = label;
+    });
+}
 
 var errorHintMap = {
     "0": "Successful",
@@ -216,11 +223,13 @@ Ajax.post(
                         return (Number(b) === 3 ? 1 : 0) - (Number(a) === 3 ? 1 : 0);
                     });
                     var hotspotSelector = document.getElementById("hotspot-selector");
-                    var options = "";
+                    hotspotSelector.replaceChildren();
                     for (var i = 0; i < globalConfig.hotspotTypes.length; i++) {
-                        options += '<option value="' + globalConfig.hotspotTypes[i] + '">' + hotspotMap[globalConfig.hotspotTypes[i]] + '</option>';
+                        var option = document.createElement("option");
+                        option.value = globalConfig.hotspotTypes[i];
+                        option.textContent = hotspotMap[globalConfig.hotspotTypes[i]] || "Access";
+                        hotspotSelector.appendChild(option);
                     }
-                    hotspotSelector.innerHTML = options;
                     var tabs = document.getElementById("hotspot-tabs");
                     tabs.replaceChildren();
                     globalConfig.hotspotTypes.forEach(function(type) {

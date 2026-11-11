@@ -192,7 +192,7 @@
           <div class="settings-scroll">
             <section class="settings-section tab-panel" id="content-panel" role="tabpanel" aria-labelledby="content-tab" hidden>
               <div class="section-intro">
-                <span class="step-number">01</span>
+                <span class="step-number">02</span>
                 <div><h2 id="content-step-title">Portal basics</h2><p id="content-step-description">Start with your portal name and welcome message.</p></div>
               </div>
               <div class="content-wizard-step" data-content-step="0">
@@ -246,6 +246,20 @@
                   <select data-field="accessStyle"><option value="dropdown">Dropdown</option><option value="tabs">Tab view</option></select>
                 </label>
                 <div class="access-method-note">Access methods are configured in Omada. The selector is hidden when only one method is enabled.</div>
+                <fieldset class="preview-methods">
+                  <legend>Methods to preview</legend>
+                  <label><input type="checkbox" data-preview-method="3" checked> Voucher Access</label>
+                  <label><input type="checkbox" data-preview-method="5"> Local User</label>
+                  <label><input type="checkbox" data-preview-method="6"> SMS</label>
+                  <label><input type="checkbox" data-preview-method="8"> RADIUS</label>
+                  <label><input type="checkbox" data-preview-method="2"> Form Auth</label>
+                  <p>Preview only. Configure enabled methods in Omada.</p>
+                </fieldset>
+                <label class="field">Voucher label <input data-field="accessLabelVoucher" maxlength="40"></label>
+                <label class="field">Local User label <input data-field="accessLabelLocal" maxlength="40"></label>
+                <label class="field">SMS label <input data-field="accessLabelSms" maxlength="40"></label>
+                <label class="field">RADIUS label <input data-field="accessLabelRadius" maxlength="40"></label>
+                <label class="field">Form Auth label <input data-field="accessLabelForm" maxlength="40"></label>
                 <label class="field">Connect button text <input data-field="buttonLabel" maxlength="40" placeholder="Connect to Wi-Fi"></label>
               </div>
               <div class="content-wizard-step" data-content-step="3" hidden>
@@ -294,14 +308,14 @@
               </div>
               <div class="content-wizard-navigation">
                 <button class="button button-quiet" id="content-step-back" type="button">Back</button>
-                <span id="content-step-count">Step 1 of 7</span>
+                <span id="content-step-count">Step 2 of 8</span>
                 <button class="button button-primary" id="content-step-next" type="button">Next</button>
               </div>
             </section>
 
             <section class="settings-section tab-panel" id="style-panel" role="tabpanel" aria-labelledby="style-tab">
               <div class="section-intro">
-                <span class="step-number">02</span>
+                <span class="step-number">01</span>
                 <div><h2>Set the mood</h2><p>Pick a starting point, then fine-tune it.</p></div>
               </div>
               <div class="field">
@@ -325,11 +339,11 @@
                 </select>
               </label>
               <div class="preview-hint"><span aria-hidden="true">✦</span><p>Changes update the live preview. Try the preview theme button to check both color modes.</p></div>
+              <div class="content-wizard-navigation"><span>Step 1 of 8</span><button class="button button-primary" id="style-step-next" type="button">Next</button></div>
             </section>
 
             <section class="settings-section tab-panel" id="messages-panel" role="tabpanel" aria-labelledby="messages-tab" hidden>
               <div class="section-intro">
-                <span class="step-number">04</span>
                 <div><h2>Message Prompt</h2><p>Customize the messages shown when Omada reports an authentication result.</p></div>
               </div>
               <p class="images-note">Edit the text for each error code. Leave a field blank to use Omada's default message.</p>
@@ -359,13 +373,12 @@
             <div class="browser-frame desktop">
               <iframe id="portal-preview" title="Live preview of your Omada Wi-Fi portal"></iframe>
             </div>
-            <p class="preview-caption">Preview only · Authentication activates when deployed to your Omada controller.</p>
           </div>
         </section>
       </div>
     </section>
   </main>
-  <footer class="app-footer">Made by <strong>Gomezilla Portal Studio</strong></footer>
+  <footer class="app-footer">Preview only · Authentication activates when deployed to your Omada controller.</footer>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <dialog class="features-dialog" id="features-dialog" aria-labelledby="features-title">
     <button class="dialog-close" id="features-close" type="button" aria-label="Close features">×</button>
