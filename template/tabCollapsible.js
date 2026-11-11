@@ -9,6 +9,17 @@ window.onload = function() {
 
   for (i = 0; i < coll.length; i++) {
       coll[i].addEventListener("click", function() {
+          if (this.dataset.presentation === "prompt") {
+              var dialog = document.getElementById("info-dialog");
+              document.getElementById("info-dialog-title").textContent = this.childNodes[0].textContent.trim();
+              var content = document.getElementById("info-dialog-content");
+              content.replaceChildren();
+              Array.from(this.nextElementSibling.childNodes).forEach(function(node) {
+                  content.appendChild(node.cloneNode(true));
+              });
+              dialog.showModal();
+              return;
+          }
           var alreadyActive = this.classList.contains('active');
           // first, collapse all buttons
           for (var j = 0; j < coll.length; j++) {
@@ -16,6 +27,7 @@ window.onload = function() {
               coll[j].nextElementSibling.style.display = "none";
               coll[j].setAttribute("aria-expanded", "false");
           }
+
           // then expand the clicked one, if it wasn't already active
           if (!alreadyActive) {
               this.classList.add("active");
@@ -24,6 +36,10 @@ window.onload = function() {
           }
       });
   }
+
+  document.getElementById("info-dialog-close").addEventListener("click", function() {
+      document.getElementById("info-dialog").close();
+  });
 
   var passwordInput = document.getElementById('password');
   var toggleButton = document.getElementById('togglePassword');

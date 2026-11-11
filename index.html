@@ -175,7 +175,7 @@
           <span class="draft-tag">DRAFT</span>
         </div>
         <div class="editor-actions">
-          <button class="button button-quiet" id="editor-save-button" type="button">Save draft</button>
+          <span class="draft-autosave">Draft autosaves</span>
           <button class="button button-primary" id="export-button" type="button"><span aria-hidden="true">↓</span> Export ZIP</button>
         </div>
       </div>
@@ -185,13 +185,12 @@
       <div class="editor-body">
         <aside class="settings-panel" aria-label="Portal customization">
           <div class="settings-tabs" role="tablist" aria-label="Customization sections">
-            <button class="settings-tab active" role="tab" aria-selected="true" aria-controls="content-panel" id="content-tab" data-panel="content-panel">Content</button>
-            <button class="settings-tab" role="tab" aria-selected="false" aria-controls="style-panel" id="style-tab" data-panel="style-panel">Style</button>
-            <button class="settings-tab" role="tab" aria-selected="false" aria-controls="images-panel" id="images-tab" data-panel="images-panel">Images</button>
+            <button class="settings-tab active" role="tab" aria-selected="true" aria-controls="style-panel" id="style-tab" data-panel="style-panel">Style</button>
+            <button class="settings-tab" role="tab" aria-selected="false" aria-controls="content-panel" id="content-tab" data-panel="content-panel">Content</button>
             <button class="settings-tab" role="tab" aria-selected="false" aria-controls="messages-panel" id="messages-tab" data-panel="messages-panel">Message Prompt</button>
           </div>
           <div class="settings-scroll">
-            <section class="settings-section tab-panel" id="content-panel" role="tabpanel" aria-labelledby="content-tab">
+            <section class="settings-section tab-panel" id="content-panel" role="tabpanel" aria-labelledby="content-tab" hidden>
               <div class="section-intro">
                 <span class="step-number">01</span>
                 <div><h2 id="content-step-title">Portal basics</h2><p id="content-step-description">Start with your portal name and welcome message.</p></div>
@@ -214,6 +213,13 @@
                 </div>
               </div>
               <div class="content-wizard-step" data-content-step="1" hidden>
+                <p class="images-note">Use JPG, PNG, GIF, or WebP gallery images up to 1 MB each.</p>
+                <button class="button button-quiet add-image-button" id="add-gallery-image-button" type="button">＋ Add gallery image</button>
+                <input id="gallery-image-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+                <p class="gallery-count" id="gallery-count" aria-live="polite"></p>
+                <div class="image-slots" id="image-slots"></div>
+              </div>
+              <div class="content-wizard-step" data-content-step="5" hidden>
                 <div class="subsection-heading"><h3>Speed test card</h3></div>
                 <label class="field">Card heading <input data-field="speedTitle" maxlength="50"></label>
                 <label class="field">Small card label <input data-field="speedEyebrow" maxlength="40"></label>
@@ -234,10 +240,16 @@
                   <code>speed.cloudflare.com</code><code>ipwho.is</code>
                   <button class="text-button" id="copy-preauth-domains" type="button">Copy domains</button>
                 </div>
-                <div class="access-method-note"><strong>Access method stays on.</strong> Guests need the access form to connect to your network.</div>
-                <label class="field">Connect button <input data-field="buttonLabel" maxlength="40" placeholder="Connect to Wi-Fi"></label>
               </div>
               <div class="content-wizard-step" data-content-step="2" hidden>
+                <label class="field">Access method style
+                  <select data-field="accessStyle"><option value="dropdown">Dropdown</option><option value="tabs">Tab view</option></select>
+                </label>
+                <div class="access-method-note">Access methods are configured in Omada. The selector is hidden when only one method is enabled.</div>
+                <label class="field">Connect button text <input data-field="buttonLabel" maxlength="40" placeholder="Connect to Wi-Fi"></label>
+              </div>
+              <div class="content-wizard-step" data-content-step="3" hidden>
+                <label class="field">Display style <select data-field="plansStyle"><option value="dropdown">Dropdown</option><option value="prompt">Prompt</option></select></label>
                 <label class="field">Plan table title <input data-field="plansTitle" maxlength="50" placeholder="Plans & pricing"></label>
                 <div class="field-row">
                   <label class="field">First column <input data-field="priceHeading" maxlength="30" placeholder="Price"></label>
@@ -250,21 +262,19 @@
                 <div class="subsection-heading"><h3>Plan rows</h3><button class="text-button" id="add-plan-button" type="button">＋ Add row</button></div>
                 <div id="plan-rows" class="plan-rows"></div>
               </div>
-              <div class="content-wizard-step" data-content-step="3" hidden>
+              <div class="content-wizard-step" data-content-step="4" hidden>
+                <label class="field">Display style <select data-field="guideStyle"><option value="dropdown">Dropdown</option><option value="prompt">Prompt</option></select></label>
                 <label class="field">Connection guide title <input data-field="guideTitle" maxlength="50" placeholder="How to connect"></label>
                 <label class="field">Guide secondary label <input data-field="guideSecondaryLabel" maxlength="45" placeholder="(Paano kumonekta)"></label>
-                <label class="field">Step 1 <textarea data-field="guideStep1" maxlength="180" rows="2"></textarea></label>
-                <label class="field">Step 2 <textarea data-field="guideStep2" maxlength="180" rows="2"></textarea></label>
-                <label class="field">Step 3 <textarea data-field="guideStep3" maxlength="180" rows="2"></textarea></label>
-                <div class="subsection-heading"><h3>Connection guide images</h3></div>
-                <p class="guide-images-note">The sample instruction images are included by default. Replace them with your own, or remove any step image.</p>
+                <div class="subsection-heading"><h3>Guide steps</h3><button class="text-button" id="add-guide-step" type="button">＋ Add step</button></div>
+                <p class="guide-images-note">Add instructions and optional images up to 500 KB each.</p>
                 <div id="guide-image-slots" class="guide-image-slots"></div>
                 <div class="field-toggle">
                   <div><strong>Connection guide</strong><span>Show the expandable instructions</span></div>
                   <label class="switch"><input type="checkbox" data-field="showGuide" aria-label="Show how-to guide"><span></span></label>
                 </div>
               </div>
-              <div class="content-wizard-step" data-content-step="4" hidden>
+              <div class="content-wizard-step" data-content-step="6" hidden>
                 <label class="field">Small note <textarea data-field="note" maxlength="140" rows="2" placeholder="Hourly plans pause automatically when you disconnect."></textarea></label>
                 <div class="field-toggle">
                   <div><strong>Small note</strong><span>Show the note below the portal sections</span></div>
@@ -284,12 +294,12 @@
               </div>
               <div class="content-wizard-navigation">
                 <button class="button button-quiet" id="content-step-back" type="button">Back</button>
-                <span id="content-step-count">Step 1 of 5</span>
+                <span id="content-step-count">Step 1 of 7</span>
                 <button class="button button-primary" id="content-step-next" type="button">Next</button>
               </div>
             </section>
 
-            <section class="settings-section tab-panel" id="style-panel" role="tabpanel" aria-labelledby="style-tab" hidden>
+            <section class="settings-section tab-panel" id="style-panel" role="tabpanel" aria-labelledby="style-tab">
               <div class="section-intro">
                 <span class="step-number">02</span>
                 <div><h2>Set the mood</h2><p>Pick a starting point, then fine-tune it.</p></div>
@@ -317,18 +327,6 @@
               <div class="preview-hint"><span aria-hidden="true">✦</span><p>Changes update the live preview. Try the preview theme button to check both color modes.</p></div>
             </section>
 
-            <section class="settings-section tab-panel" id="images-panel" role="tabpanel" aria-labelledby="images-tab" hidden>
-              <div class="section-intro">
-                <span class="step-number">03</span>
-                <div><h2>Tell your story</h2><p>Replace any slide in the rotating gallery.</p></div>
-              </div>
-              <p class="images-note">Use JPG, PNG, GIF, or WebP images up to 1 MB each. Your original images are preserved unless replaced.</p>
-              <button class="button button-quiet add-image-button" id="add-gallery-image-button" type="button">＋ Add gallery image</button>
-              <input id="gallery-image-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
-              <p class="gallery-count" id="gallery-count" aria-live="polite"></p>
-              <div class="image-slots" id="image-slots"></div>
-            </section>
-
             <section class="settings-section tab-panel" id="messages-panel" role="tabpanel" aria-labelledby="messages-tab" hidden>
               <div class="section-intro">
                 <span class="step-number">04</span>
@@ -344,16 +342,11 @@
           <div class="preview-toolbar">
             <div class="preview-heading"><span class="live-indicator"></span><strong>Live preview</strong></div>
             <div class="preview-toolbar-actions">
-              <div class="preview-device-switch" role="group" aria-label="Preview device size">
-                <button class="preview-device-button active" type="button" data-preview-device="mobile" aria-pressed="true">Mobile</button>
-                <button class="preview-device-button" type="button" data-preview-device="desktop" aria-pressed="false">Desktop</button>
-              </div>
               <button class="theme-preview-button" id="theme-preview-button" type="button"><span aria-hidden="true">☼</span> Preview dark mode</button>
             </div>
           </div>
           <div class="preview-canvas">
-            <div class="browser-frame mobile">
-              <div class="browser-top"><span class="traffic-lights"><i></i><i></i><i></i></span><span class="address-bar">welcome.portal</span><span class="frame-menu">•••</span></div>
+            <div class="browser-frame desktop">
               <iframe id="portal-preview" title="Live preview of your Omada Wi-Fi portal"></iframe>
             </div>
             <p class="preview-caption">Preview only · Authentication activates when deployed to your Omada controller.</p>

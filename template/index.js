@@ -25,8 +25,8 @@ var originUrl = getQueryStringKey("originUrl");
 var previewSite = getQueryStringKey("previewSite");
 
 var hotspotMap = {
-    3: "Voucher Access",
-    5: "Local User Access",
+    3: "Voucher",
+    5: "Account",
     6: "SMS Access",
     8: "RADIUS Access"
 };
@@ -144,12 +144,13 @@ Ajax.post(
             countryCode: !!data.sms && data.sms.countryCode || 1
         };
 
-        function showOperPrompt(message, isError) {
+        function showOperPrompt(message, isError, title) {
             var dialog = document.getElementById("oper-prompt");
             if (!dialog || !message) return;
             dialog.dataset.kind = isError ? "error" : "success";
-            document.getElementById("oper-prompt-title").textContent = isError ? "Unable to connect" : "Connection notice";
+            document.getElementById("oper-prompt-title").textContent = isError ? "Unable to connect" : (title || "Success");
             document.getElementById("oper-prompt-icon").textContent = isError ? "!" : "✓";
+            document.getElementById("oper-prompt-close").textContent = isError ? "Retry" : "OK";
             document.getElementById("oper-prompt-message").textContent = message;
             if (!dialog.open) dialog.showModal();
         }
@@ -217,8 +218,23 @@ Ajax.post(
                         options += '<option value="' + globalConfig.hotspotTypes[i] + '">' + hotspotMap[globalConfig.hotspotTypes[i]] + '</option>';
                     }
                     hotspotSelector.innerHTML = options;
+                    var tabs = document.getElementById("hotspot-tabs");
+                    tabs.replaceChildren();
+                    globalConfig.hotspotTypes.forEach(function(type) {
+                        var button = document.createElement("button");
+                        button.type = "button";
+                        button.textContent = hotspotMap[type] || "Access";
+                        button.dataset.type = type;
+                        button.addEventListener("click", function() {
+                            hotspotSelector.value = type;
+                            hotspotChang(type);
+                        });
+                        tabs.appendChild(button);
+                    });
+                    var useTabs = document.body.dataset.accessStyle === "tabs";
+                    tabs.hidden = !useTabs;
+                    hotspotSelector.parentElement.hidden = useTabs;
                     hotspotChang(globalConfig.hotspotTypes[0]);
-                    window.authType = globalConfig.hotspotTypes[0];
                     document.getElementById("hotspot-section").style.display = globalConfig.hotspotTypes.length > 1 ? "block" : "none";
                     break;
             }
@@ -282,7 +298,8 @@ Ajax.post(
                         if (!!data && data.errorCode === 0) {
                             isCommited = true;
                             landingUrl = data.result || landingUrl;
-                            window.location.href = landingUrl;
+                            showOperPrompt(errorHintMap["0"], false);
+                            window.setTimeout(function() { window.location.href = landingUrl; }, 3000);
                         } else {
                             showOperPrompt(errorHintMap[data.errorCode] || "Authentication failed. Please check your details and try again.", true);
                         }
@@ -301,6 +318,11 @@ Ajax.post(
             document.getElementById("input-verify-code").style.display = "none";
             document.getElementById("button-login").style.display = "block";
             window.authType = Number(type);
+            document.querySelectorAll("#hotspot-tabs button").forEach(function(button) {
+                var selected = Number(button.dataset.type) === Number(type);
+                button.classList.toggle("active", selected);
+                button.setAttribute("aria-pressed", String(selected));
+            });
             switch (Number(type)) {
                 case 3:
                     document.getElementById("input-voucher").style.display = "block";
@@ -354,7 +376,7 @@ Ajax.post(
                 );
             }
             sendSmsAuthCode();
-            showOperPrompt("Sending authorization code…", false);
+            showOperPrompt("Sending authorization code…", false, "Connection notice");
         });
         pageConfigParse();
     }

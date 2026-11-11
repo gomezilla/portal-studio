@@ -15,6 +15,8 @@
   ];
   const MAX_GALLERY_IMAGES = 20;
   const MAX_IMAGE_BYTES = 1_048_576;
+  const MAX_GUIDE_IMAGE_BYTES = 500_000;
+  const MAX_GUIDE_STEPS = 20;
   const MAX_EXPORT_BYTES = 2_000_000;
   const DEFAULT_ERROR_MESSAGES = {
     "0": "Successful",
@@ -83,6 +85,14 @@
     guideStep1: "1. Open Wi-Fi settings and connect to Prepaid Hotspot or Prepaid Hotspot_2.4G.",
     guideStep2: "2. Select Voucher Access.",
     guideStep3: "3. Enter your voucher code and tap Connect to Wi-Fi.",
+    guideSteps: [
+      "1. Open Wi-Fi settings and connect to Prepaid Hotspot or Prepaid Hotspot_2.4G.",
+      "2. Select Voucher Access.",
+      "3. Enter your voucher code and tap Connect to Wi-Fi."
+    ],
+    accessStyle: "dropdown",
+    plansStyle: "dropdown",
+    guideStyle: "dropdown",
     termsText: `By using this Wi-Fi service, you agree to use it only for lawful purposes and to follow these terms.
 
 ACCEPTABLE USE
@@ -168,7 +178,6 @@ Review and adapt these sample terms to the network operator's actual practices a
   let toastTimer = 0;
   let sizeCheckTimer = 0;
   let previewThemeOverride = null;
-  let previewDevice = "mobile";
   let passwordRecoveryPromptShown = false;
   let contentWizardStep = 0;
   const templateAssets = new Map();
@@ -602,11 +611,24 @@ Review and adapt these sample terms to the network operator's actual practices a
   function renderGuideImageSlots() {
     const list = $("#guide-image-slots");
     list.replaceChildren();
-    currentProject.guideImages.forEach((image, index) => {
+    $("#add-guide-step").disabled = currentProject.settings.guideSteps.length >= MAX_GUIDE_STEPS;
+    currentProject.settings.guideSteps.forEach((step, index) => {
+      const image = currentProject.guideImages[index];
       const row = document.createElement("div");
       row.className = "guide-image-slot";
-      const title = document.createElement("strong");
-      title.textContent = `Step ${index + 1} image`;
+      const title = document.createElement("label");
+      title.className = "field guide-step-text";
+      title.textContent = `Step ${index + 1}`;
+      const text = document.createElement("textarea");
+      text.value = step;
+      text.maxLength = 180;
+      text.rows = 2;
+      text.addEventListener("input", () => {
+        currentProject.settings.guideSteps[index] = text.value;
+        scheduleSave();
+        updatePreview();
+      });
+      title.append(text);
       const preview = document.createElement("img");
       preview.className = "guide-image-thumb";
       preview.alt = image ? `Connection guide step ${index + 1}` : "";
@@ -625,6 +647,20 @@ Review and adapt these sample terms to the network operator's actual practices a
       choose.addEventListener("click", () => input.click());
       input.addEventListener("change", () => handleGuideImageFile(input, index));
       actions.append(choose);
+      if (currentProject.settings.guideSteps.length > 1) {
+        const removeStep = document.createElement("button");
+        removeStep.type = "button";
+        removeStep.className = "image-action remove";
+        removeStep.textContent = "Remove step";
+        removeStep.addEventListener("click", () => {
+          currentProject.settings.guideSteps.splice(index, 1);
+          currentProject.guideImages.splice(index, 1);
+          renderGuideImageSlots();
+          scheduleSave();
+          updatePreview();
+        });
+        actions.append(removeStep);
+      }
       if (image) {
         const remove = document.createElement("button");
         remove.type = "button";
@@ -653,8 +689,8 @@ Review and adapt these sample terms to the network operator's actual practices a
       input.value = "";
       return;
     }
-    if (file.size > MAX_IMAGE_BYTES) {
-      showToast("Images must be 1 MB or smaller.", true);
+    if (file.size > MAX_GUIDE_IMAGE_BYTES) {
+      showToast("Guide images must be 500 KB or smaller.", true);
       input.value = "";
       return;
     }
@@ -1373,6 +1409,10 @@ Review and adapt these sample terms to the network operator's actual practices a
   function normalizeProject(project) {
     const defaultSettings = JSON.parse(JSON.stringify(DEFAULTS));
     const settings = { ...defaultSettings, ...(project.settings || {}) };
+    settings.guideSteps = Array.isArray(project.settings?.guideSteps)
+      ? project.settings.guideSteps.slice(0, MAX_GUIDE_STEPS)
+      : [settings.guideStep1, settings.guideStep2, settings.guideStep3];
+    if (!settings.guideSteps.length) settings.guideSteps = [""];
     settings.plans = Array.isArray(project.settings?.plans) ? project.settings.plans : defaultSettings.plans;
     settings.errorMessages = Object.fromEntries(Object.keys(DEFAULT_ERROR_MESSAGES).map(code => [
       code,
@@ -1392,7 +1432,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       settings,
       images,
       guideImages: Array.isArray(project.guideImages)
-        ? GUIDE_IMAGE_PATHS.map((path, index) => {
+        ? settings.guideSteps.map((step, index) => {
           const image = project.guideImages[index];
           return image && typeof image.src === "string" ? image : null;
         })
@@ -1511,7 +1551,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     document.body.classList.add("editor-active");
     $("#top-save-button").hidden = false;
     $("#project-name").value = currentProject.name;
-    setActiveTab($("#content-tab"));
+    setActiveTab($("#style-tab"));
     setContentWizardStep(0);
     renderFields();
     syncAccent();
@@ -1610,19 +1650,21 @@ Review and adapt these sample terms to the network operator's actual practices a
   }
 
   function setContentWizardStep(step) {
-    contentWizardStep = Math.max(0, Math.min(4, step));
-    const titles = ["Portal basics", "Access and speed", "Plans and pricing", "Connection guide", "Finishing touches"];
+    contentWizardStep = Math.max(0, Math.min(6, step));
+    const titles = ["Portal basics", "Gallery images", "Access method", "Plans and pricing", "Connection guide", "Access and speed", "Finishing touches"];
     const descriptions = [
       "Start with your portal name and welcome message.",
-      "Customize network status while keeping the access method available.",
+      "Manage the rotating gallery images.",
+      "Choose how guests select an access method.",
       "Set up plan labels and pricing rows.",
       "Write instructions and manage their sample images.",
+      "Customize the network speed card.",
       "Add optional notes, a custom footer, and guest terms acceptance."
     ];
     $$("[data-content-step]").forEach(panel => {
       panel.hidden = Number(panel.dataset.contentStep) !== contentWizardStep;
     });
-    $(".section-intro .step-number").textContent = `0${contentWizardStep + 1}`;
+    $("#content-panel .step-number").textContent = `0${contentWizardStep + 1}`;
     $("#content-step-title").textContent = titles[contentWizardStep];
     $("#content-step-description").textContent = descriptions[contentWizardStep];
     $("#content-step-count").textContent = `Step ${contentWizardStep + 1} of ${titles.length}`;
@@ -1920,20 +1962,22 @@ Review and adapt these sample terms to the network operator's actual practices a
     }
     const guideContent = doc.querySelectorAll(".content")[1];
     if (guideContent) {
-      const steps = guideContent.querySelectorAll("p");
-      [settings.guideStep1, settings.guideStep2, settings.guideStep3].forEach((text, index) => {
-        if (steps[index]) steps[index].textContent = text;
-      });
-      guideContent.querySelectorAll("img").forEach((image, index) => {
+      guideContent.replaceChildren();
+      settings.guideSteps.forEach((text, index) => {
+        const paragraph = doc.createElement("p");
+        paragraph.textContent = text;
+        guideContent.append(paragraph);
         const guideImage = currentProject.guideImages[index];
-        if (!guideImage) {
-          image.remove();
-          return;
-        }
+        if (!guideImage) return;
+        const image = doc.createElement("img");
         image.src = getGuideImageSource(guideImage, index, forPreview);
         image.alt = `Connection guide step ${index + 1}`;
+        guideContent.append(image);
       });
     }
+    doc.body.dataset.accessStyle = settings.accessStyle;
+    if (collapsibles[0]) collapsibles[0].dataset.presentation = settings.plansStyle;
+    if (collapsibles[1]) collapsibles[1].dataset.presentation = settings.guideStyle;
 
     const visibility = [
       [".header", settings.showHeader !== false],
@@ -1983,7 +2027,7 @@ Review and adapt these sample terms to the network operator's actual practices a
         }
       });
       const customStyle = doc.createElement("style");
-      customStyle.textContent = themeCss(settings, mode);
+      customStyle.textContent = `${themeCss(settings, mode)} body{min-height:100vh;}`;
       doc.head.append(customStyle);
       doc.documentElement.dataset.theme = activeThemeMode;
       doc.body.dataset.preview = "true";
@@ -1991,6 +2035,27 @@ Review and adapt these sample terms to the network operator's actual practices a
       scripts.forEach(script => script.remove());
       const voucher = query("#input-voucher");
       if (voucher) voucher.style.display = "block";
+      const hotspotSection = query("#hotspot-section");
+      hotspotSection.style.display = "block";
+      const previewSelector = query("#hotspot-selector");
+      [["3", "Voucher"], ["5", "Account"]].forEach(([value, label]) => {
+        const option = doc.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        previewSelector.append(option);
+      });
+      previewSelector.parentElement.hidden = settings.accessStyle === "tabs";
+      const previewTabs = query("#hotspot-tabs");
+      previewTabs.hidden = settings.accessStyle !== "tabs";
+      [["3", "Voucher"], ["5", "Account"]].forEach(([value, label], index) => {
+        const button = doc.createElement("button");
+        button.type = "button";
+        button.dataset.type = value;
+        button.textContent = label;
+        button.classList.toggle("active", index === 0);
+        button.setAttribute("aria-pressed", String(index === 0));
+        previewTabs.append(button);
+      });
       const loginButton = query("#button-login");
       if (loginButton) loginButton.type = "button";
       setText("#speedtest-status", "Live speed testing runs on your deployed Omada portal.");
@@ -2002,9 +2067,14 @@ Review and adapt these sample terms to the network operator's actual practices a
         slides.forEach(function(slide,index){slide.style.display=index===0?"block":"none";});
         if(slides.length>1)setInterval(function(){slides[at].style.display="none";at=(at+1)%slides.length;slides[at].style.display="block";},3000);
         document.querySelectorAll(".collapsible").forEach(function(button){button.addEventListener("click",function(){
+          if(button.dataset.presentation==="prompt"){var dialog=document.getElementById("info-dialog");document.getElementById("info-dialog-title").textContent=button.childNodes[0].textContent.trim();var content=document.getElementById("info-dialog-content");content.replaceChildren();button.nextElementSibling.childNodes.forEach(function(node){content.appendChild(node.cloneNode(true));});dialog.showModal();return;}
           var panel=button.nextElementSibling;var open=button.classList.toggle("active");button.setAttribute("aria-expanded",String(open));panel.style.display=open?"block":"none";
         });});
-        function prompt(message,isError){var dialog=document.getElementById("oper-prompt");dialog.dataset.kind=isError?"error":"success";document.getElementById("oper-prompt-title").textContent=isError?"Unable to connect":"Connection notice";document.getElementById("oper-prompt-icon").textContent=isError?"!":"✓";document.getElementById("oper-prompt-message").textContent=message;if(!dialog.open)dialog.showModal();}
+        document.getElementById("info-dialog-close").addEventListener("click",function(){document.getElementById("info-dialog").close();});
+        function access(type){document.getElementById("input-voucher").style.display=type==="3"?"block":"none";document.getElementById("input-user").style.display=type==="5"?"block":"none";document.getElementById("input-password").style.display=type==="5"?"block":"none";document.querySelectorAll("#hotspot-tabs button").forEach(function(button){var selected=button.dataset.type===type;button.classList.toggle("active",selected);button.setAttribute("aria-pressed",String(selected));});}
+        document.getElementById("hotspot-selector").addEventListener("change",function(event){access(event.target.value);});
+        document.querySelectorAll("#hotspot-tabs button").forEach(function(button){button.addEventListener("click",function(){access(button.dataset.type);});});
+        function prompt(message,isError){var dialog=document.getElementById("oper-prompt");dialog.dataset.kind=isError?"error":"success";document.getElementById("oper-prompt-title").textContent=isError?"Unable to connect":"Success";document.getElementById("oper-prompt-icon").textContent=isError?"!":"✓";document.getElementById("oper-prompt-close").textContent=isError?"Retry":"OK";document.getElementById("oper-prompt-message").textContent=message;if(!dialog.open)dialog.showModal();}
         var terms=document.getElementById("terms-acceptance"),check=document.getElementById("terms-checkbox");
         function requireTerms(){if(!terms||terms.style.display==="none"||!check||check.checked)return true;prompt("Please agree to the Terms of Service before connecting to Wi-Fi.",true);check.focus();return false;}
         var login=document.getElementById("button-login");if(login)login.addEventListener("click",function(event){if(!requireTerms())event.preventDefault();});
@@ -2059,18 +2129,6 @@ Review and adapt these sample terms to the network operator's actual practices a
     button.innerHTML = isPreviewDark()
       ? '<span aria-hidden="true">☾</span> Preview light mode'
       : '<span aria-hidden="true">☼</span> Preview dark mode';
-  }
-
-  function setPreviewDevice(device) {
-    previewDevice = device;
-    const frame = $(".browser-frame");
-    frame.classList.toggle("mobile", previewDevice === "mobile");
-    frame.classList.toggle("desktop", previewDevice === "desktop");
-    $$("[data-preview-device]").forEach(button => {
-      const selected = button.dataset.previewDevice === previewDevice;
-      button.classList.toggle("active", selected);
-      button.setAttribute("aria-pressed", String(selected));
-    });
   }
 
   function showThankYou(action) {
@@ -2669,8 +2727,16 @@ Review and adapt these sample terms to the network operator's actual practices a
   });
   $("#content-step-back").addEventListener("click", () => setContentWizardStep(contentWizardStep - 1));
   $("#content-step-next").addEventListener("click", () => {
-    if (contentWizardStep === 4) setActiveTab($("#style-tab"));
+    if (contentWizardStep === 6) setActiveTab($("#messages-tab"));
     else setContentWizardStep(contentWizardStep + 1);
+  });
+  $("#add-guide-step").addEventListener("click", () => {
+    if (currentProject.settings.guideSteps.length >= MAX_GUIDE_STEPS) return;
+    currentProject.settings.guideSteps.push("");
+    currentProject.guideImages.push(null);
+    renderGuideImageSlots();
+    scheduleSave();
+    updatePreview();
   });
   $("#request-access-button").addEventListener("click", async () => {
     if (pendingRequest) {
@@ -2726,7 +2792,6 @@ Review and adapt these sample terms to the network operator's actual practices a
   });
   $("#back-button").addEventListener("click", showDashboard);
   $("#top-save-button").addEventListener("click", () => saveCurrentProject());
-  $("#editor-save-button").addEventListener("click", () => saveCurrentProject());
   $("#export-button").addEventListener("click", exportProject);
   $("#project-name").addEventListener("input", () => {
     if (!currentProject) return;
@@ -2778,9 +2843,6 @@ Review and adapt these sample terms to the network operator's actual practices a
     previewThemeOverride = isPreviewDark() ? "light" : "dark";
     setPreviewThemeButton();
     updatePreview();
-  });
-  $$("[data-preview-device]").forEach(button => {
-    button.addEventListener("click", () => setPreviewDevice(button.dataset.previewDevice));
   });
   $("#thank-you-close").addEventListener("click", () => $("#thank-you-dialog").close());
   $("#thank-you-continue").addEventListener("click", () => $("#thank-you-dialog").close());
