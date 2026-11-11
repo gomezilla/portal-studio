@@ -2046,7 +2046,6 @@ Review and adapt these sample terms to the network operator's actual practices a
 
   function syncAccent() {
     $("#accent-hex").textContent = currentProject.settings.accentColor.toUpperCase();
-    document.documentElement.style.setProperty("--accent", currentProject.settings.accentColor);
   }
 
   function isHexColor(value) {
@@ -2803,7 +2802,35 @@ Review and adapt these sample terms to the network operator's actual practices a
       $("#notifications-button").setAttribute("aria-expanded", "false");
     }
   });
-  $("#support-button").addEventListener("click", () => showThankYou("support"));
+  $("#support-button").addEventListener("click", () => {
+    const panel = $("#support-panel");
+    panel.hidden = !panel.hidden;
+    $("#support-button").setAttribute("aria-expanded", String(!panel.hidden));
+  });
+  $("#support-project").addEventListener("click", () => {
+    $("#support-panel").hidden = true;
+    $("#support-button").setAttribute("aria-expanded", "false");
+    showThankYou("support");
+  });
+  $("#support-panel").addEventListener("click", event => {
+    if (event.target.closest("a")) {
+      $("#support-panel").hidden = true;
+      $("#support-button").setAttribute("aria-expanded", "false");
+    }
+  });
+  document.addEventListener("click", event => {
+    if (!event.target.closest(".support-wrap")) {
+      $("#support-panel").hidden = true;
+      $("#support-button").setAttribute("aria-expanded", "false");
+    }
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !$("#support-panel").hidden) {
+      $("#support-panel").hidden = true;
+      $("#support-button").setAttribute("aria-expanded", "false");
+      $("#support-button").focus();
+    }
+  });
   $("#offline-folder-button")?.addEventListener("click", chooseOfflineExportFolder);
   $("#password-change-button")?.addEventListener("click", () => {
     $("#password-change-message").textContent = "";
