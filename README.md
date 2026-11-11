@@ -40,6 +40,8 @@ After exporting, Portal Studio shows a dismissible success panel with an optiona
 
 Create an account with a unique, case-insensitive username and an email and password. Usernames use 3–30 letters, numbers, or underscores; sign-in still uses email. Existing users are prompted to choose a username. Signed-in users and administrators can change their password from the top menu. New accounts may need to verify their email before signing in, depending on the Supabase project's email-confirmation setting. Existing users can use **Forgot password?** to set a password; the reset link returns to the site and opens the new-password form automatically. In Supabase Authentication → URL Configuration, allow `https://gomezilla.github.io/portal-studio/` as a redirect URL. If Supabase's built-in email service reaches its rate limit, wait before requesting another email; configure custom SMTP in Supabase Dashboard → Authentication → SMTP Settings for reliable delivery.
 
+The workspace greets signed-in users by their saved username according to the device's local time; signed-out visitors see a generic greeting. The offline copy uses a generic greeting because it has no user accounts.
+
 The notification bell shows the newest five updates first, with a Show all control, mark-all-read and clear actions. Read and cleared status syncs to the account; clearing does not delete the underlying requests or audit records. The administrator user table shows last active separately from last login. Activity is recorded on sign-in and at most once every five minutes during interaction; it is not an exact presence indicator. The existing sign-in activity filters and analytics continue to use last login.
 
 ## Template source

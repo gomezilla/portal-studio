@@ -162,6 +162,7 @@ Review and adapt these sample terms to the network operator's actual practices a
   let templateHtml = "";
   let currentProject = null;
   let currentUser = null;
+  let currentUsername = "";
   let pendingCreateAfterSignIn = false;
   let quota = null;
   let isAdmin = false;
@@ -849,15 +850,13 @@ Review and adapt these sample terms to the network operator's actual practices a
     const setupWarning = $("#account-setup-warning");
     const signInButton = $("#sign-in-button");
     const signOutButton = $("#sign-out-button");
-    const accountEmail = $("#account-email");
     const accountPanel = $("#account-panel");
     const setupError = window.portalStudioSetupError || "";
     setupWarning.hidden = !setupError;
     if (setupError) setupWarning.textContent = setupError;
     signInButton.hidden = OFFLINE_MODE || !configured || Boolean(currentUser);
     signOutButton.hidden = OFFLINE_MODE || !configured || !currentUser;
-    accountEmail.hidden = !currentUser;
-    accountEmail.textContent = currentUser?.email || "";
+    updateWorkspaceGreeting();
     accountPanel.hidden = OFFLINE_MODE || !configured || Boolean(setupError);
     setupWarning.hidden = OFFLINE_MODE || !setupError;
     const savedSlotUnavailable = !OFFLINE_MODE && Boolean(currentUser && (!quota || (!isAdmin && !quota.is_locked && projects.length >= quota.saved_limit)));
@@ -893,6 +892,14 @@ Review and adapt these sample terms to the network operator's actual practices a
     $("#admin-requests").hidden = !can("review_access");
     $("#admin-unlock-requests").hidden = !can("review_unlock");
     renderNotifications();
+  }
+
+  function updateWorkspaceGreeting() {
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+    $("#workspace-greeting").textContent = currentUser && currentUsername
+      ? `${greeting}, ${currentUsername}.`
+      : `${greeting}.`;
   }
 
   async function fetchNotificationRows(queryFactory) {
@@ -1124,6 +1131,7 @@ Review and adapt these sample terms to the network operator's actual practices a
 
   async function loadAccountData() {
     if (!currentUser || !supabaseClient) return;
+    const userId = currentUser.id;
     try {
       await loadReadNotificationState();
       const [draftsResult, quotaResult, adminResult, requests, credits, unlocks, profileResult, permissionsResult, broadcasts] = await Promise.all([
@@ -1150,6 +1158,8 @@ Review and adapt these sample terms to the network operator's actual practices a
       if (adminResult.error) throw adminResult.error;
       if (profileResult.error) throw profileResult.error;
       if (permissionsResult.error) throw permissionsResult.error;
+      if (currentUser?.id !== userId) return;
+      currentUsername = profileResult.data.username || "";
       usernameNeeded = !profileResult.data.username;
       quota = quotaResult.data?.[0] || null;
       isAdmin = adminResult.data === true;
@@ -2665,6 +2675,7 @@ Review and adapt these sample terms to the network operator's actual practices a
         if (event === "SIGNED_IN") {
           window.setTimeout(async () => {
             currentUser = session?.user || null;
+            currentUsername = "";
             userRequests = [];
             userUnlockRequests = [];
             creditNotifications = [];
@@ -2687,6 +2698,7 @@ Review and adapt these sample terms to the network operator's actual practices a
           }, 0);
         } else if (event === "SIGNED_OUT") {
           currentUser = null;
+          currentUsername = "";
           projects = [];
           userRequests = [];
           userUnlockRequests = [];
@@ -2840,6 +2852,8 @@ Review and adapt these sample terms to the network operator's actual practices a
     try {
       const { error } = await supabaseClient.rpc("set_portal_username", { p_username: $("#username-input").value.trim() });
       if (error) throw error;
+      currentUsername = $("#username-input").value.trim();
+      updateWorkspaceGreeting();
       usernameNeeded = false;
       $("#username-dialog").close();
       showToast("Username saved.");
@@ -3260,5 +3274,10 @@ Review and adapt these sample terms to the network operator's actual practices a
     }
   });
 
+  updateWorkspaceGreeting();
+  window.setInterval(updateWorkspaceGreeting, 60_000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) updateWorkspaceGreeting();
+  });
   initialize();
 })();
