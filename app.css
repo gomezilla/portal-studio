@@ -295,6 +295,8 @@ body.editor-active .editor { height: calc(100vh - 38px); }
 .notification-heading .icon-button { width: 27px; height: 27px; }
 .notification-actions { display: flex; justify-content: flex-end; gap: 14px; padding: 8px 14px; }
 .notification-show-all { display: block; margin: 10px auto; }
+#delegation-options { display: grid; gap: 8px; margin: 14px 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+#delegation-options label { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .notification-item { padding: 11px 14px; border-bottom: 1px solid #efeff3; }
 .notification-item:last-child { border-bottom: 0; }
 .notification-message { position: relative; width: 100%; padding: 0 0 0 12px; border: 0; color: inherit; background: transparent; font: inherit; text-align: left; cursor: pointer; }

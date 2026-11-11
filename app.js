@@ -165,6 +165,11 @@ Review and adapt these sample terms to the network operator's actual practices a
   let pendingCreateAfterSignIn = false;
   let quota = null;
   let isAdmin = false;
+  let delegatedPermissions = new Set();
+  let broadcastNotifications = [];
+  let delegationLoadedEmail = "";
+  const can = permission => isAdmin || delegatedPermissions.has(permission);
+  const canAccessAdminDashboard = () => isAdmin || delegatedPermissions.size > 0;
   let pendingRequest = null;
   let pendingUnlockRequest = null;
   let userRequests = [];
@@ -358,7 +363,7 @@ Review and adapt these sample terms to the network operator's actual practices a
   }
 
   async function refreshAdminDashboard() {
-    try {
+    if (isAdmin) try {
       const { data: analytics, error: analyticsError } = await supabaseClient.rpc("get_portal_admin_analytics");
       if (analyticsError) throw analyticsError;
       $("#metric-users").textContent = Number(analytics.total_users).toLocaleString();
@@ -372,7 +377,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       showToast(`Could not load admin analytics: ${error.message}`, true);
       return;
     }
-    try {
+    if (can("view_users")) try {
       await loadAdminUsers();
     } catch (error) {
       showToast(`Could not load admin users: ${error.message}`, true);
@@ -467,6 +472,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       credits.className = "credit-button";
       credits.textContent = "＋ Credits";
       credits.title = "Grant template and export credits";
+      credits.hidden = !can("grant_credits");
       credits.addEventListener("click", () => grantUserCredits(user));
       const lock = document.createElement("button");
       lock.type = "button";
@@ -479,6 +485,7 @@ Review and adapt these sample terms to the network operator's actual practices a
         ? `Unlock account${user.lock_reason ? `: ${user.lock_reason}` : ""}`
         : "Lock account and require an unlock request";
       lock.disabled = user.is_admin;
+      lock.hidden = !can("lock_accounts");
       lock.addEventListener("click", () => setAdminUserLock(user));
       const remove = document.createElement("button");
       remove.type = "button";
@@ -486,6 +493,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       remove.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16m-10 4v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3" /></svg>';
       remove.setAttribute("aria-label", `Delete ${user.email}`);
       remove.disabled = user.is_admin;
+      remove.hidden = !isAdmin;
       remove.title = remove.disabled ? "Administrator accounts cannot be removed here" : "Delete this user and their saved portals";
       remove.addEventListener("click", () => removeAdminUser(user));
       actions.append(credits, lock, remove);
@@ -507,6 +515,7 @@ Review and adapt these sample terms to the network operator's actual practices a
         const project = normalizeProject(row.payload);
         project.id = row.id;
         project.userId = row.user_id;
+        project.readOnlyAdminView = !isAdmin;
         project.name = row.name;
         project.updatedAt = row.updated_at;
         remoteDraftIds.add(project.id);
@@ -518,7 +527,7 @@ Review and adapt these sample terms to the network operator's actual practices a
         ? `${Number(user.exports_used).toLocaleString()} exports used · unlimited account allowance`
         : `${Number(user.exports_used).toLocaleString()} of ${Number(user.exports_allowed).toLocaleString()} exports used`;
       $("#admin-user-portals-quota").textContent =
-        `${user.templates_saved} saved · ${exportAllowance} · Administrator preview and exports are unlimited.`;
+        `${user.templates_saved} saved · ${exportAllowance} · ${isAdmin ? "Administrator preview and exports are unlimited." : "Read-only preview; editing and exporting are disabled."}`;
       const list = $("#admin-user-portals-list");
       list.replaceChildren();
       if (!adminUserProjects.length) {
@@ -763,6 +772,10 @@ Review and adapt these sample terms to the network operator's actual practices a
 
   async function saveCurrentProject(silent = false) {
     if (!currentProject || (!OFFLINE_MODE && (!currentUser || !quota))) return false;
+    if (currentProject.readOnlyAdminView) {
+      showToast("Delegated portal access is read-only.", true);
+      return false;
+    }
     if (currentProject.locked) return true;
     window.clearTimeout(saveTimer);
     currentProject.name = ($("#project-name").value.trim() || "Untitled Wi-Fi Portal").slice(0, 70);
@@ -850,7 +863,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     const savedSlotUnavailable = !OFFLINE_MODE && Boolean(currentUser && (!quota || (!isAdmin && !quota.is_locked && projects.length >= quota.saved_limit)));
     $("#create-button").disabled = !OFFLINE_MODE && (!configured || Boolean(setupError) || savedSlotUnavailable);
     $("#empty-create-button").disabled = !OFFLINE_MODE && (!configured || Boolean(setupError) || savedSlotUnavailable);
-    $("#admin-dashboard-button").hidden = !isAdmin;
+    $("#admin-dashboard-button").hidden = !canAccessAdminDashboard();
     const passwordChangeButton = $("#password-change-button");
     if (passwordChangeButton) passwordChangeButton.hidden = OFFLINE_MODE || !currentUser;
     const offlineFolderButton = $("#offline-folder-button");
@@ -870,15 +883,15 @@ Review and adapt these sample terms to the network operator's actual practices a
         : "Submit a justification to request that your account be unlocked."
       : pendingRequest
         ? `Your request is ${pendingRequest.status}.`
-        : "Each account starts with one saved portal and one export.";
+        : "New accounts start with one saved portal and three exports.";
     const requestButton = $("#request-access-button");
     requestButton.hidden = isAdmin || !currentUser || !quota || quota.is_locked;
     requestButton.textContent = pendingRequest ? "Request pending" : "Request more access";
     const unlockButton = $("#unlock-account-button");
     unlockButton.hidden = isAdmin || !currentUser || !quota?.is_locked;
     unlockButton.textContent = pendingUnlockRequest ? "Unlock request pending" : "Request account unlock";
-    $("#admin-requests").hidden = !isAdmin;
-    $("#admin-unlock-requests").hidden = !isAdmin;
+    $("#admin-requests").hidden = !can("review_access");
+    $("#admin-unlock-requests").hidden = !can("review_unlock");
     renderNotifications();
   }
 
@@ -950,7 +963,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     if (!list) return;
     list.replaceChildren();
     const items = [];
-    if (isAdmin) {
+    if (can("review_access")) {
       adminPendingRequests.forEach(request => items.push({
         id: `access:${request.id}:pending`,
         date: request.created_at,
@@ -958,6 +971,8 @@ Review and adapt these sample terms to the network operator's actual practices a
         message: `${request.requested_templates} template and ${request.requested_exports} export credits requested · ${request.reason}`,
         action: "Review requests"
       }));
+    }
+    if (can("review_unlock")) {
       adminPendingUnlockRequests.forEach(request => items.push({
         id: `unlock:${request.id}:pending`,
         date: request.created_at,
@@ -1000,6 +1015,12 @@ Review and adapt these sample terms to the network operator's actual practices a
       date: entry.created_at,
       title: "Additional credits granted",
       message: `An administrator added ${entry.template_credits} template and ${entry.export_credits} export credits.`
+    }));
+    broadcastNotifications.forEach(entry => items.push({
+      id: `broadcast:${entry.id}`,
+      date: entry.created_at,
+      title: entry.title,
+      message: entry.message
     }));
     visibleNotificationItems = items.filter(item => !dismissedNotificationIds.has(item.id))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -1063,7 +1084,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     }
     try {
       await loadReadNotificationState();
-      const [requests, credits, unlocks] = await Promise.all([
+      const [requests, credits, unlocks, broadcasts] = await Promise.all([
         fetchNotificationRows(() => supabaseClient.from("portal_access_requests")
           .select("id,status,created_at,reviewed_at,reviewed_by,reason,requested_templates,requested_exports,approved_templates,approved_exports")
           .eq("user_id", currentUser.id).order("created_at", { ascending: false }).order("id")),
@@ -1073,21 +1094,24 @@ Review and adapt these sample terms to the network operator's actual practices a
           .order("created_at", { ascending: false }).order("id")),
         fetchNotificationRows(() => supabaseClient.from("portal_unlock_requests")
           .select("id,status,created_at,reviewed_at,reason")
-          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).order("id"))
+          .eq("user_id", currentUser.id).order("created_at", { ascending: false }).order("id")),
+        fetchNotificationRows(() => supabaseClient.from("portal_broadcasts")
+          .select("id,title,message,created_at").order("created_at", { ascending: false }).order("id"))
       ]);
       userRequests = requests;
       creditNotifications = credits;
       userUnlockRequests = unlocks;
+      broadcastNotifications = broadcasts;
       pendingRequest = userRequests.find(request => request.status === "pending") || null;
       pendingUnlockRequest = userUnlockRequests.find(request => request.status === "pending") || null;
-      if (isAdmin) {
+      if (can("review_access") || can("review_unlock")) {
         const [pending, unlocksPending] = await Promise.all([
-          fetchNotificationRows(() => supabaseClient.from("portal_access_requests")
+          can("review_access") ? fetchNotificationRows(() => supabaseClient.from("portal_access_requests")
             .select("id,email,reason,requested_templates,requested_exports,created_at")
-            .eq("status", "pending").order("created_at", { ascending: true }).order("id")),
-          fetchNotificationRows(() => supabaseClient.from("portal_unlock_requests")
+            .eq("status", "pending").order("created_at", { ascending: true }).order("id")) : Promise.resolve([]),
+          can("review_unlock") ? fetchNotificationRows(() => supabaseClient.from("portal_unlock_requests")
             .select("id,email,reason,created_at")
-            .eq("status", "pending").order("created_at", { ascending: true }).order("id"))
+            .eq("status", "pending").order("created_at", { ascending: true }).order("id")) : Promise.resolve([])
         ]);
         adminPendingRequests = pending;
         adminPendingUnlockRequests = unlocksPending;
@@ -1102,7 +1126,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     if (!currentUser || !supabaseClient) return;
     try {
       await loadReadNotificationState();
-      const [draftsResult, quotaResult, adminResult, requests, credits, unlocks, profileResult] = await Promise.all([
+      const [draftsResult, quotaResult, adminResult, requests, credits, unlocks, profileResult, permissionsResult, broadcasts] = await Promise.all([
         supabaseClient.from("portal_drafts").select("id,user_id,name,payload,updated_at").eq("user_id", currentUser.id).order("updated_at", { ascending: false }),
         supabaseClient.rpc("get_my_portal_quota"),
         supabaseClient.rpc("is_portal_admin"),
@@ -1116,15 +1140,21 @@ Review and adapt these sample terms to the network operator's actual practices a
         fetchNotificationRows(() => supabaseClient.from("portal_unlock_requests")
           .select("id,status,created_at,reviewed_at,reason")
           .eq("user_id", currentUser.id).order("created_at", { ascending: false }).order("id")),
-        supabaseClient.from("portal_profiles").select("username").eq("user_id", currentUser.id).single()
+        supabaseClient.from("portal_profiles").select("username").eq("user_id", currentUser.id).single(),
+        supabaseClient.from("portal_delegated_permissions").select("permission").eq("user_id", currentUser.id),
+        fetchNotificationRows(() => supabaseClient.from("portal_broadcasts")
+          .select("id,title,message,created_at").order("created_at", { ascending: false }).order("id"))
       ]);
       if (draftsResult.error) throw draftsResult.error;
       if (quotaResult.error) throw quotaResult.error;
       if (adminResult.error) throw adminResult.error;
       if (profileResult.error) throw profileResult.error;
+      if (permissionsResult.error) throw permissionsResult.error;
       usernameNeeded = !profileResult.data.username;
       quota = quotaResult.data?.[0] || null;
       isAdmin = adminResult.data === true;
+      delegatedPermissions = new Set(permissionsResult.data.map(row => row.permission));
+      broadcastNotifications = broadcasts;
       userRequests = requests;
       creditNotifications = credits;
       userUnlockRequests = unlocks;
@@ -1145,17 +1175,26 @@ Review and adapt these sample terms to the network operator's actual practices a
       updateAccountControls();
       renderNotifications();
       renderDashboard();
-      if (isAdmin) {
-        await Promise.all([renderAdminRequests(), renderAdminUnlockRequests(), refreshAdminDashboard()]);
+      if (canAccessAdminDashboard()) {
+        await Promise.all([
+          can("review_access") ? renderAdminRequests() : Promise.resolve(),
+          can("review_unlock") ? renderAdminUnlockRequests() : Promise.resolve(),
+          refreshAdminDashboard()
+        ]);
       }
       if (!passwordRecoveryCallback && !$("#auth-dialog").open) showUsernamePrompt();
     } catch (error) {
       quota = null;
+      isAdmin = false;
       window.portalStudioSetupError = `Account storage is not ready: ${error.message}. Run supabase/schema.sql in the Supabase SQL Editor and complete the setup steps in README.`;
       projects = [];
       userRequests = [];
       userUnlockRequests = [];
       creditNotifications = [];
+      broadcastNotifications = [];
+      delegatedPermissions = new Set();
+      adminPendingRequests = [];
+      adminPendingUnlockRequests = [];
       pendingRequest = null;
       pendingUnlockRequest = null;
       renderNotifications();
@@ -1284,6 +1323,8 @@ Review and adapt these sample terms to the network operator's actual practices a
       [["Approve…", true], ["Deny", false]].forEach(([label, approved]) => {
         const button = document.createElement("button");
         button.textContent = label;
+        button.disabled = approved && !can("grant_credits");
+        if (button.disabled) button.title = "Credit-grant permission is required to approve.";
         if (approved) button.className = "approve";
         button.addEventListener("click", () => reviewAccessRequest(request.id, approved));
         actions.append(button);
@@ -1291,7 +1332,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       row.append(text, actions);
       list.append(row);
     });
-    $("#admin-requests").hidden = !isAdmin;
+    $("#admin-requests").hidden = !can("review_access");
   }
 
   async function renderAdminUnlockRequests() {
@@ -1330,7 +1371,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       row.append(text, actions);
       list.append(row);
     });
-    $("#admin-unlock-requests").hidden = !isAdmin;
+    $("#admin-unlock-requests").hidden = !can("review_unlock");
   }
 
   async function setAdminUserLock(user) {
@@ -1402,7 +1443,9 @@ Review and adapt these sample terms to the network operator's actual practices a
       account_locked: "Account locked",
       account_unlocked: "Account unlocked",
       unlock_request_approved: "Unlock request approved",
-      unlock_request_denied: "Unlock request denied"
+      unlock_request_denied: "Unlock request denied",
+      permissions_changed: "Permissions changed",
+      broadcast_sent: "Notification sent"
     };
     data.forEach(entry => {
       const row = document.createElement("tr");
@@ -1413,7 +1456,11 @@ Review and adapt these sample terms to the network operator's actual practices a
         labels[entry.action] || entry.action,
         Number(entry.template_credits).toLocaleString(),
         Number(entry.export_credits).toLocaleString(),
-        entry.details?.reason || ""
+        entry.details?.reason || (entry.action === "permissions_changed"
+          ? `Permissions: ${(entry.details?.permissions || []).join(", ") || "none"}`
+          : entry.action === "broadcast_sent"
+            ? `${entry.details?.title || ""} · ${entry.details?.recipient_count ?? 0} recipients`
+            : "")
       ];
       values.forEach(value => {
         const cell = document.createElement("td");
@@ -1627,11 +1674,12 @@ Review and adapt these sample terms to the network operator's actual practices a
 
   function updateEditorLockState() {
     const locked = Boolean(currentProject.locked);
-    $("#project-name").readOnly = locked;
-    $(".settings-panel").inert = locked;
-    $(".draft-autosave").textContent = locked ? "Locked · read-only" : "Draft autosaves";
-    $("#top-save-button").disabled = locked;
-    $("#editor-unlock-button").hidden = !locked;
+    const readOnly = locked || Boolean(currentProject.readOnlyAdminView);
+    $("#project-name").readOnly = readOnly;
+    $(".settings-panel").inert = readOnly;
+    $(".draft-autosave").textContent = currentProject.readOnlyAdminView ? "Read-only · delegated access" : locked ? "Locked · read-only" : "Draft autosaves";
+    $("#top-save-button").disabled = readOnly;
+    $("#editor-unlock-button").hidden = !locked || Boolean(currentProject.readOnlyAdminView);
   }
 
   function openEditor() {
@@ -1666,7 +1714,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     document.body.classList.remove("editor-active");
     editorView.hidden = true;
     $("#top-save-button").hidden = true;
-    if (adminViewingUser && isAdmin) {
+    if (adminViewingUser && can("view_users")) {
       dashboardView.hidden = true;
       adminDashboardView.hidden = false;
       $("#admin-user-portals").hidden = false;
@@ -1678,19 +1726,29 @@ Review and adapt these sample terms to the network operator's actual practices a
   }
 
   async function showAdminDashboard() {
-    if (!isAdmin) return;
+    if (!canAccessAdminDashboard()) return;
     document.body.classList.remove("editor-active");
     editorView.hidden = true;
     dashboardView.hidden = true;
     adminDashboardView.hidden = false;
     adminViewingUser = null;
-    $("#admin-users-panel").hidden = false;
-    $("#admin-requests").hidden = false;
-    $("#admin-audit-panel").hidden = false;
+    $("#admin-analytics").hidden = !isAdmin;
+    $("#admin-users-panel").hidden = !can("view_users");
+    $("#admin-requests").hidden = !can("review_access");
+    $("#admin-unlock-requests").hidden = !can("review_unlock");
+    $("#admin-audit-panel").hidden = !isAdmin;
+    $("#delegation-panel").hidden = !isAdmin;
+    $("#broadcast-panel").hidden = !can("send_broadcast");
+    $("#delegated-actions-panel").hidden = !(can("grant_credits") || can("lock_accounts"));
+    $("#delegated-credit-button").hidden = !can("grant_credits");
+    $("#delegated-lock-button").hidden = !can("lock_accounts");
     $("#admin-user-portals").hidden = true;
     $("#top-save-button").hidden = true;
     await refreshAdminDashboard();
-    await Promise.all([renderAdminRequests(), renderAdminUnlockRequests()]);
+    await Promise.all([
+      can("review_access") ? renderAdminRequests() : Promise.resolve(),
+      can("review_unlock") ? renderAdminUnlockRequests() : Promise.resolve()
+    ]);
     window.scrollTo(0, 0);
   }
 
@@ -2389,6 +2447,9 @@ Review and adapt these sample terms to the network operator's actual practices a
         bar.classList.add("error");
         status.textContent = `ZIP is ${formatBytes(size)}; it must be under 2 MB. Remove gallery images or replace large images with smaller, optimized files.`;
         button.disabled = true;
+      } else if (currentProject.readOnlyAdminView) {
+        status.textContent = "Delegated portal access is read-only; export is unavailable.";
+        button.disabled = true;
       } else if (!OFFLINE_MODE && !isAdmin && quota?.is_locked) {
         bar.classList.add("warning");
         status.textContent = "Your account is locked. Choose Export ZIP to review the reason and request an unlock.";
@@ -2411,6 +2472,10 @@ Review and adapt these sample terms to the network operator's actual practices a
 
   async function exportProject() {
     if (!currentProject || !templateHtml) return;
+    if (currentProject.readOnlyAdminView) {
+      showToast("Delegated portal access does not permit exports.", true);
+      return;
+    }
     if (!OFFLINE_MODE && (!currentUser || !quota)) {
       showToast("Sign in and load your account quota before exporting.", true);
       return;
@@ -2607,6 +2672,8 @@ Review and adapt these sample terms to the network operator's actual practices a
             adminPendingUnlockRequests = [];
             quota = null;
             isAdmin = false;
+            delegatedPermissions = new Set();
+            broadcastNotifications = [];
             pendingRequest = null;
             pendingUnlockRequest = null;
             renderNotifications();
@@ -2631,6 +2698,8 @@ Review and adapt these sample terms to the network operator's actual practices a
           currentProject = null;
           quota = null;
           isAdmin = false;
+          delegatedPermissions = new Set();
+          broadcastNotifications = [];
           pendingRequest = null;
           pendingUnlockRequest = null;
           readNotificationIds = new Set();
@@ -2873,11 +2942,114 @@ Review and adapt these sample terms to the network operator's actual practices a
   });
   $("#admin-user-portals-back").addEventListener("click", () => {
     adminViewingUser = null;
-    $("#admin-users-panel").hidden = false;
-    $("#admin-requests").hidden = false;
-    $("#admin-audit-panel").hidden = false;
+    $("#admin-users-panel").hidden = !can("view_users");
+    $("#admin-requests").hidden = !can("review_access");
+    $("#admin-audit-panel").hidden = !isAdmin;
     $("#admin-user-portals").hidden = true;
   });
+  $("#broadcast-audience").addEventListener("change", event => {
+    const selected = event.currentTarget.value === "selected";
+    $("#broadcast-recipients-field").hidden = !selected;
+    $("#broadcast-recipients").required = selected;
+  });
+  $("#broadcast-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = $("#broadcast-submit");
+    const status = $("#broadcast-status");
+    const selected = $("#broadcast-audience").value === "selected";
+    const emails = selected ? $("#broadcast-recipients").value.split(/[,\n]+/).map(email => email.trim()).filter(Boolean) : null;
+    if (selected && !emails.length) {
+      status.textContent = "Enter at least one recipient email.";
+      return;
+    }
+    if (!window.confirm(selected ? `Send this notification to ${emails.length} specified email addresses?` : "Send this notification to all current accounts?")) return;
+    button.disabled = true;
+    status.textContent = "Sending…";
+    try {
+      const { data, error } = await supabaseClient.rpc("send_portal_broadcast", {
+        p_title: $("#broadcast-title").value.trim(),
+        p_message: $("#broadcast-message").value.trim(),
+        p_emails: emails
+      });
+      if (error) throw error;
+      status.textContent = `Notification sent to ${data} accounts.`;
+      $("#broadcast-title").value = "";
+      $("#broadcast-message").value = "";
+      await refreshNotifications();
+      if (isAdmin) await loadAdminAuditLog();
+    } catch (error) {
+      status.textContent = `Could not send notification: ${error.message}`;
+    } finally {
+      button.disabled = false;
+    }
+  });
+  $("#delegation-email").addEventListener("input", () => {
+    delegationLoadedEmail = "";
+    $("#delegation-options").disabled = true;
+    $("#delegation-save").disabled = true;
+  });
+  $("#delegation-load").addEventListener("click", async () => {
+    const email = $("#delegation-email").value.trim();
+    const status = $("#delegation-status");
+    if (!$("#delegation-email").reportValidity()) return;
+    $("#delegation-options").disabled = true;
+    $("#delegation-save").disabled = true;
+    status.textContent = "Loading permissions…";
+    try {
+      const { data, error } = await supabaseClient.rpc("get_portal_permissions_for_user", { p_email: email });
+      if (error) throw error;
+      if ($("#delegation-email").value.trim() !== email) return;
+      delegationLoadedEmail = email;
+      $$("#delegation-options input").forEach(input => { input.checked = data.includes(input.value); });
+      $("#delegation-options").disabled = false;
+      $("#delegation-save").disabled = false;
+      status.textContent = "Choose permissions. Clear all selections to revoke access.";
+    } catch (error) {
+      status.textContent = `Could not load permissions: ${error.message}`;
+    }
+  });
+  $("#delegation-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const email = $("#delegation-email").value.trim();
+    const status = $("#delegation-status");
+    if (!delegationLoadedEmail || email !== delegationLoadedEmail) {
+      status.textContent = "Load permissions for this email before saving.";
+      return;
+    }
+    const button = $("#delegation-save");
+    button.disabled = true;
+    try {
+      const { error } = await supabaseClient.rpc("set_portal_permissions", {
+        p_email: email,
+        p_permissions: $$("#delegation-options input:checked").map(input => input.value)
+      });
+      if (error) throw error;
+      status.textContent = "Permissions saved.";
+      await loadAdminAuditLog();
+    } catch (error) {
+      status.textContent = `Could not save permissions: ${error.message}`;
+    } finally {
+      button.disabled = !delegationLoadedEmail || $("#delegation-email").value.trim() !== email;
+    }
+  });
+  async function runDelegatedAccountAction(action) {
+    const input = $("#delegated-action-email");
+    const status = $("#delegated-action-status");
+    if (!input.reportValidity()) return;
+    status.textContent = "Looking up account…";
+    try {
+      const { data, error } = await supabaseClient.rpc("find_portal_action_user", { p_email: input.value.trim() });
+      if (error) throw error;
+      status.textContent = "";
+      if (action === "credit") await grantUserCredits(data);
+      else await setAdminUserLock(data);
+    } catch (error) {
+      status.textContent = `Could not look up account: ${error.message}`;
+    }
+  }
+  $("#delegated-actions-form").addEventListener("submit", event => event.preventDefault());
+  $("#delegated-credit-button").addEventListener("click", () => runDelegatedAccountAction("credit"));
+  $("#delegated-lock-button").addEventListener("click", () => runDelegatedAccountAction("lock"));
   $("#features-button").addEventListener("click", () => $("#features-dialog").showModal());
   $("#features-close").addEventListener("click", () => $("#features-dialog").close());
   $("#features-done").addEventListener("click", () => $("#features-dialog").close());

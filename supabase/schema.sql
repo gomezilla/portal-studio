@@ -44,6 +44,46 @@ create policy "Users manage own notification state" on public.portal_notificatio
   for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 grant select, insert, update, delete on public.portal_notification_state to authenticated;
 
+create table if not exists public.portal_delegated_permissions (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  permission text not null check (permission in (
+    'review_access', 'review_unlock', 'grant_credits', 'lock_accounts', 'view_users', 'send_broadcast'
+  )),
+  granted_at timestamptz not null default now(),
+  granted_by uuid references auth.users(id) on delete set null,
+  primary key (user_id, permission)
+);
+alter table public.portal_delegated_permissions enable row level security;
+drop policy if exists "Users read own delegated permissions" on public.portal_delegated_permissions;
+create policy "Users read own delegated permissions" on public.portal_delegated_permissions
+  for select to authenticated using (user_id = auth.uid());
+grant select on public.portal_delegated_permissions to authenticated;
+
+create table if not exists public.portal_broadcasts (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid references auth.users(id) on delete set null,
+  title text not null check (length(title) between 1 and 100),
+  message text not null check (length(message) between 1 and 2000),
+  created_at timestamptz not null default now()
+);
+create table if not exists public.portal_broadcast_recipients (
+  broadcast_id uuid not null references public.portal_broadcasts(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  primary key (broadcast_id, user_id)
+);
+create index if not exists portal_broadcast_recipients_user_idx on public.portal_broadcast_recipients(user_id);
+alter table public.portal_broadcasts enable row level security;
+alter table public.portal_broadcast_recipients enable row level security;
+drop policy if exists "Users read own broadcast recipients" on public.portal_broadcast_recipients;
+create policy "Users read own broadcast recipients" on public.portal_broadcast_recipients
+  for select to authenticated using (user_id = auth.uid());
+drop policy if exists "Users read their broadcasts" on public.portal_broadcasts;
+create policy "Users read their broadcasts" on public.portal_broadcasts
+  for select to authenticated using (
+    exists (select 1 from public.portal_broadcast_recipients r where r.broadcast_id = id and r.user_id = auth.uid())
+  );
+grant select on public.portal_broadcasts, public.portal_broadcast_recipients to authenticated;
+
 create table if not exists public.portal_profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
   username text check (username is null or username ~ '^[A-Za-z0-9_]{3,30}$'),
@@ -65,6 +105,8 @@ begin
     raise exception 'Username must be 3 to 30 letters, numbers, or underscores.';
   end if;
   insert into public.portal_profiles(user_id, username) values (new.id, requested_username);
+  insert into public.portal_quotas(user_id, extra_exports) values (new.id, 2)
+    on conflict (user_id) do nothing;
   return new;
 end;
 $$;
@@ -130,7 +172,8 @@ create table if not exists public.portal_access_audit_log (
   user_email text not null,
   action text not null check (action in (
     'request_approved', 'request_denied', 'credits_granted', 'user_removed',
-    'account_locked', 'account_unlocked', 'unlock_request_approved', 'unlock_request_denied'
+    'account_locked', 'account_unlocked', 'unlock_request_approved', 'unlock_request_denied',
+    'permissions_changed', 'broadcast_sent'
   )),
   template_credits integer not null default 0 check (template_credits >= 0),
   export_credits integer not null default 0 check (export_credits >= 0),
@@ -143,7 +186,8 @@ alter table public.portal_access_audit_log
 alter table public.portal_access_audit_log
   add constraint portal_access_audit_log_action_check check (action in (
     'request_approved', 'request_denied', 'credits_granted', 'user_removed',
-    'account_locked', 'account_unlocked', 'unlock_request_approved', 'unlock_request_denied'
+    'account_locked', 'account_unlocked', 'unlock_request_approved', 'unlock_request_denied',
+    'permissions_changed', 'broadcast_sent'
   ));
 
 create index if not exists portal_access_audit_log_created_at_idx
@@ -203,8 +247,8 @@ as $$
 declare
   target_email text;
 begin
-  if not public.is_portal_admin() then
-    raise exception 'Administrator access is required.';
+  if not public.has_portal_permission('lock_accounts') then
+    raise exception 'Account-lock permission is required.';
   end if;
   if p_user_id = auth.uid() then
     raise exception 'You cannot lock or unlock your own administrator account.';
@@ -299,8 +343,8 @@ as $$
 declare
   unlock_request public.portal_unlock_requests;
 begin
-  if not public.is_portal_admin() then
-    raise exception 'Administrator access is required.';
+  if not public.has_portal_permission('review_unlock') then
+    raise exception 'Unlock-request review permission is required.';
   end if;
 
   select * into unlock_request
@@ -309,6 +353,9 @@ begin
   for update;
   if not found then
     raise exception 'This unlock request is not pending.';
+  end if;
+  if not public.is_portal_admin() and unlock_request.user_id = auth.uid() then
+    raise exception 'You cannot review your own unlock request.';
   end if;
 
   if p_approve then
@@ -351,6 +398,108 @@ as $$
     where lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
   );
 $$;
+
+create or replace function public.has_portal_permission(p_permission text)
+returns boolean language sql stable security definer set search_path = public, auth as $$
+  select auth.uid() is not null and (
+    public.is_portal_admin() or exists (
+      select 1 from public.portal_delegated_permissions
+      where user_id = auth.uid() and permission = p_permission
+    )
+  );
+$$;
+revoke all on function public.has_portal_permission(text) from public, anon;
+grant execute on function public.has_portal_permission(text) to authenticated;
+
+create or replace function public.set_portal_permissions(p_email text, p_permissions text[])
+returns void language plpgsql security definer set search_path = public, auth as $$
+declare target auth.users; normalized text[];
+begin
+  if not public.is_portal_admin() then raise exception 'Administrator access is required.'; end if;
+  if p_permissions is null or array_position(p_permissions, null) is not null
+     or exists (select 1 from unnest(p_permissions) p where p not in (
+       'review_access', 'review_unlock', 'grant_credits', 'lock_accounts', 'view_users', 'send_broadcast'
+     )) then raise exception 'Invalid permission selection.'; end if;
+  select * into target from auth.users where lower(email) = lower(trim(p_email));
+  if not found then raise exception 'No account matches that email.'; end if;
+  if exists (select 1 from public.portal_admins where lower(email) = lower(target.email)) then
+    raise exception 'Administrator accounts already have full access.';
+  end if;
+  select coalesce(array_agg(distinct p order by p), array[]::text[]) into normalized from unnest(p_permissions) p;
+  delete from public.portal_delegated_permissions where user_id = target.id;
+  insert into public.portal_delegated_permissions(user_id, permission, granted_by)
+    select target.id, p, auth.uid() from unnest(normalized) p;
+  insert into public.portal_access_audit_log(admin_email, user_id, user_email, action, details)
+    values (coalesce(auth.jwt() ->> 'email', ''), target.id, coalesce(target.email, ''),
+      'permissions_changed', jsonb_build_object('permissions', normalized));
+end;
+$$;
+
+create or replace function public.get_portal_permissions_for_user(p_email text)
+returns text[] language plpgsql stable security definer set search_path = public, auth as $$
+declare target_id uuid;
+begin
+  if not public.is_portal_admin() then raise exception 'Administrator access is required.'; end if;
+  select id into target_id from auth.users where lower(email) = lower(trim(p_email));
+  if not found then raise exception 'No account matches that email.'; end if;
+  return coalesce((select array_agg(permission order by permission)
+    from public.portal_delegated_permissions where user_id = target_id), array[]::text[]);
+end;
+$$;
+
+create or replace function public.send_portal_broadcast(p_title text, p_message text, p_emails text[] default null)
+returns integer language plpgsql security definer set search_path = public, auth as $$
+declare new_broadcast_id uuid; recipient_count integer; requested_count integer;
+begin
+  if not public.has_portal_permission('send_broadcast') then raise exception 'Broadcast permission is required.'; end if;
+  if length(trim(coalesce(p_title, ''))) not between 1 and 100
+     or length(trim(coalesce(p_message, ''))) not between 1 and 2000 then
+    raise exception 'Provide a title (1–100 characters) and message (1–2000 characters).';
+  end if;
+  if p_emails is not null then
+    if cardinality(p_emails) = 0 or cardinality(p_emails) > 500 or array_position(p_emails, null) is not null
+       or exists (select 1 from unnest(p_emails) e where trim(e) = '') then
+      raise exception 'Provide between 1 and 500 recipient emails.';
+    end if;
+    select count(distinct lower(trim(e))) into requested_count from unnest(p_emails) e;
+    select count(distinct lower(email)) into recipient_count from auth.users
+      where lower(email) in (select lower(trim(e)) from unnest(p_emails) e);
+    if recipient_count <> requested_count then raise exception 'One or more recipient emails do not match an account.'; end if;
+  end if;
+  insert into public.portal_broadcasts(sender_id, title, message)
+    values (auth.uid(), trim(p_title), trim(p_message)) returning id into new_broadcast_id;
+  insert into public.portal_broadcast_recipients(broadcast_id, user_id)
+    select new_broadcast_id, id from auth.users
+    where p_emails is null or lower(email) in (select lower(trim(e)) from unnest(p_emails) e);
+  get diagnostics recipient_count = row_count;
+  insert into public.portal_access_audit_log(admin_email, user_email, action, details)
+    values (coalesce(auth.jwt() ->> 'email', ''), '', 'broadcast_sent',
+      jsonb_build_object('broadcast_id', new_broadcast_id, 'title', trim(p_title), 'recipient_count', recipient_count));
+  return recipient_count;
+end;
+$$;
+revoke all on function public.set_portal_permissions(text, text[]), public.get_portal_permissions_for_user(text),
+  public.send_portal_broadcast(text, text, text[]) from public, anon;
+grant execute on function public.set_portal_permissions(text, text[]), public.get_portal_permissions_for_user(text),
+  public.send_portal_broadcast(text, text, text[]) to authenticated;
+
+create or replace function public.find_portal_action_user(p_email text)
+returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
+declare target auth.users; target_quota public.portal_quotas;
+begin
+  if not public.has_portal_permission('grant_credits') and not public.has_portal_permission('lock_accounts') then
+    raise exception 'Credit-grant or account-lock permission is required.';
+  end if;
+  select * into target from auth.users where lower(email) = lower(trim(p_email));
+  if not found then raise exception 'No account matches that email.'; end if;
+  select * into target_quota from public.portal_quotas where user_id = target.id;
+  return jsonb_build_object('account_id', target.id, 'email', target.email,
+    'is_locked', coalesce(target_quota.is_locked, false),
+    'is_admin', exists (select 1 from public.portal_admins where lower(email) = lower(target.email)));
+end;
+$$;
+revoke all on function public.find_portal_action_user(text) from public, anon;
+grant execute on function public.find_portal_action_user(text) to authenticated;
 
 create or replace function public.ensure_portal_quota()
 returns public.portal_quotas
@@ -547,8 +696,11 @@ as $$
 declare
   access_request public.portal_access_requests;
 begin
-  if not public.is_portal_admin() then
-    raise exception 'Administrator access is required.';
+  if not public.has_portal_permission('review_access') then
+    raise exception 'Access-request review permission is required.';
+  end if;
+  if p_approve and not public.has_portal_permission('grant_credits') then
+    raise exception 'Credit-grant permission is required to approve a request.';
   end if;
   if p_extra_templates is null or p_extra_templates < 0 or p_extra_templates > 10
      or p_extra_exports is null or p_extra_exports < 0 or p_extra_exports > 10 then
@@ -564,6 +716,9 @@ begin
   for update;
   if not found then
     raise exception 'This request is not pending.';
+  end if;
+  if not public.is_portal_admin() and access_request.user_id = auth.uid() then
+    raise exception 'You cannot review your own access request.';
   end if;
 
   if p_approve then
@@ -615,8 +770,11 @@ as $$
 declare
   target_email text;
 begin
-  if not public.is_portal_admin() then
-    raise exception 'Administrator access is required.';
+  if not public.has_portal_permission('grant_credits') then
+    raise exception 'Credit-grant permission is required.';
+  end if;
+  if not public.is_portal_admin() and p_user_id = auth.uid() then
+    raise exception 'You cannot grant credits to yourself.';
   end if;
   if p_extra_templates is null or p_extra_templates < 0 or p_extra_templates > 1000
      or p_extra_exports is null or p_extra_exports < 0 or p_extra_exports > 1000 then
@@ -727,8 +885,8 @@ as $$
 declare
   result jsonb;
 begin
-  if not public.is_portal_admin() then
-    raise exception 'Administrator access is required.';
+  if not public.has_portal_permission('view_users') then
+    raise exception 'User-view permission is required.';
   end if;
   if coalesce(p_role, 'all') not in ('all', 'admin', 'user')
      or coalesce(p_activity, 'all') not in ('all', 'active', 'inactive', 'never')
@@ -884,7 +1042,7 @@ drop policy if exists "Users insert own drafts" on public.portal_drafts;
 drop policy if exists "Users update own drafts" on public.portal_drafts;
 drop policy if exists "Users delete own drafts" on public.portal_drafts;
 create policy "Users read own drafts" on public.portal_drafts
-for select to authenticated using (user_id = auth.uid() or public.is_portal_admin());
+for select to authenticated using (user_id = auth.uid() or public.has_portal_permission('view_users'));
 create policy "Users insert own drafts" on public.portal_drafts
 for insert to authenticated with check (user_id = auth.uid());
 create policy "Users update own drafts" on public.portal_drafts
@@ -895,14 +1053,14 @@ for delete to authenticated using (user_id = auth.uid());
 
 drop policy if exists "Users read own access requests" on public.portal_access_requests;
 create policy "Users read own access requests" on public.portal_access_requests
-for select to authenticated using (user_id = auth.uid() or public.is_portal_admin());
+for select to authenticated using (user_id = auth.uid() or public.has_portal_permission('review_access'));
 drop policy if exists "Admins read access audit log" on public.portal_access_audit_log;
 drop policy if exists "Users read own or admin access audit log" on public.portal_access_audit_log;
 create policy "Users read own or admin access audit log" on public.portal_access_audit_log
 for select to authenticated using (user_id = auth.uid() or public.is_portal_admin());
 drop policy if exists "Users read own or admin unlock requests" on public.portal_unlock_requests;
 create policy "Users read own or admin unlock requests" on public.portal_unlock_requests
-for select to authenticated using (user_id = auth.uid() or public.is_portal_admin());
+for select to authenticated using (user_id = auth.uid() or public.has_portal_permission('review_unlock'));
 drop policy if exists "Admins read all access requests" on public.portal_access_requests;
 drop policy if exists "Users create own access requests" on public.portal_access_requests;
 create policy "Users create own access requests" on public.portal_access_requests
@@ -951,7 +1109,7 @@ drop policy if exists "Users delete their portal images" on storage.objects;
 drop policy if exists "Admins read portal images" on storage.objects;
 create policy "Admins read portal images" on storage.objects
 for select to authenticated using (
-  bucket_id = 'portal-images' and public.is_portal_admin()
+  bucket_id = 'portal-images' and public.has_portal_permission('view_users')
 );
 create policy "Users read their portal images" on storage.objects
 for select to authenticated using (
