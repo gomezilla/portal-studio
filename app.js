@@ -142,7 +142,8 @@ Review and adapt these sample terms to the network operator's actual practices a
     { id: "main", name: "Main", light: ["#eaf2fb", "#ffffff", "#f5f8fc", "#e7eff8", "#1c2e3b", "#637b8c", "#d7e3ed"], dark: ["#111b29", "#182536", "#1e2d40", "#26384d", "#e9f1fb", "#a4b4c5", "#34465b"], accent: "#2359d4", hover: "#1948b4", mode: "light", corners: "soft" },
     { id: "material", name: "Material You", light: ["#f3f1fa", "#ffffff", "#f7f5fb", "#eeeaf7", "#262335", "#777386", "#e7e2ef"], dark: ["#171521", "#211e2c", "#272331", "#302b3d", "#f3efff", "#ada7bc", "#3b3548"], accent: "#6750a4", hover: "#55408e", mode: "system", corners: "soft" },
     { id: "facebook", name: "Facebook", light: ["#f0f2f5", "#ffffff", "#f7f8fa", "#e4e6eb", "#1c1e21", "#65676b", "#dadde1"], dark: ["#18191a", "#242526", "#3a3b3c", "#3a3b3c", "#e4e6eb", "#b0b3b8", "#4e4f50"], accent: "#0866ff", hover: "#0756d1", mode: "light", corners: "rounded" },
-    { id: "social-media", name: "Social Media", light: ["#f2f4fb", "#ffffff", "#f8f9ff", "#e9eafd", "#24253a", "#74758b", "#dee0ed"], dark: ["#171827", "#222336", "#2c2e43", "#393b54", "#f3f4ff", "#b2b4cf", "#484a64"], accent: "#6557d2", hover: "#5144b8", mode: "system", corners: "rounded" },
+    { id: "bumblebee", name: "Bumblebee", light: ["#fff3cf", "#ffffff", "#fff8e4", "#ffedb3", "#24221c", "#655c48", "#e8d7aa"], dark: ["#161718", "#242526", "#303132", "#3b3b38", "#fff8e7", "#c5bca6", "#525047"], accent: "#ffb900", hover: "#e5a600", mode: "dark", corners: "sharp" },
+    { id: "social-media", name: "Social Media (legacy)", legacy: true, light: ["#f2f4fb", "#ffffff", "#f8f9ff", "#e9eafd", "#24253a", "#74758b", "#dee0ed"], dark: ["#171827", "#222336", "#2c2e43", "#393b54", "#f3f4ff", "#b2b4cf", "#484a64"], accent: "#6557d2", hover: "#5144b8", mode: "system", corners: "rounded" },
     { id: "youtube", name: "YouTube", light: ["#f5f5f5", "#ffffff", "#fafafa", "#eeeeee", "#202020", "#737373", "#e0e0e0"], dark: ["#0f0f0f", "#181818", "#212121", "#292929", "#f1f1f1", "#aaaaaa", "#3f3f3f"], accent: "#ff0033", hover: "#cc0029", mode: "system", corners: "sharp" },
     { id: "tiktok", name: "TikTok", light: ["#ffffff", "#ffffff", "#f5f5f5", "#69c9d0", "#010101", "#555555", "#69c9d0"], dark: ["#010101", "#171717", "#212121", "#292929", "#ffffff", "#69c9d0", "#3b3b3b"], accent: "#ee1d52", hover: "#cf1644", mode: "dark", corners: "sharp" },
     { id: "gaming", name: "Gaming / Neon", light: ["#11111b", "#191925", "#20202e", "#29283a", "#f5f3ff", "#aaa7c3", "#38364c"], dark: ["#11111b", "#191925", "#20202e", "#29283a", "#f5f3ff", "#aaa7c3", "#38364c"], accent: "#8055ff", hover: "#6740de", mode: "dark", corners: "sharp" },
@@ -2012,7 +2013,7 @@ Review and adapt these sample terms to the network operator's actual practices a
   function renderPresets() {
     const grid = $("#preset-grid");
     grid.replaceChildren();
-    PRESETS.forEach(preset => {
+    PRESETS.filter(preset => !preset.legacy || currentProject.settings.preset === preset.id).forEach(preset => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = `preset${currentProject.settings.preset === preset.id ? " selected" : ""}`;
@@ -2052,6 +2053,13 @@ Review and adapt these sample terms to the network operator's actual practices a
     return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
   }
 
+  function contrastingText(color) {
+    const rgb = [1, 3, 5].map(index => parseInt(color.slice(index, index + 2), 16) / 255)
+      .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+    return luminance > 0.179 ? "#171717" : "#ffffff";
+  }
+
   function getPreset() {
     return PRESETS.find(preset => preset.id === currentProject.settings.preset) || PRESETS[0];
   }
@@ -2074,6 +2082,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       .portal-badge,.collapsible{border-radius:calc(var(--portal-radius) * .45)!important}
       .button,#button-login,#get-code{background-color:var(--primary)!important}
       .button:hover,#button-login:hover,#get-code:hover{background-color:var(--primary-hover)!important}
+      ${preset.id === "bumblebee" ? `.button,#button-login,#get-code,.hotspot-tabs button.active{color:${contrastingText(accent)}!important}:root[data-theme="light"] .portal-badge,:root[data-theme="light"] .terms-link{color:#755100}:root[data-theme="system"] .portal-badge,:root[data-theme="system"] .terms-link{color:#755100}@media(prefers-color-scheme:dark){:root[data-theme="system"] .portal-badge,:root[data-theme="system"] .terms-link{color:var(--primary)}}` : ""}
       ${preset.id === "gaming" ? `.container{box-shadow:0 24px 70px rgba(0,0,0,.5),0 0 34px ${accent}35!important}.portal-badge{border-color:${accent}66!important}.button,#button-login,#get-code{box-shadow:0 0 20px ${accent}55!important}` : ""}`;
   }
 
