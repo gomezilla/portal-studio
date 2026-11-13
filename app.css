@@ -138,6 +138,8 @@ main { flex: 1; }
 .features-heading { max-width: 640px; margin-bottom: 22px; }
 .features-heading h2 { margin: 0 36px 8px 0; font: 750 clamp(22px, 3vw, 29px)/1.2 Manrope, sans-serif; letter-spacing: -.8px; }
 .features-heading > p:last-child { margin: 0; color: #777687; font-size: 12px; line-height: 1.6; }
+.features-section-title { margin: 22px 0 10px; font-size: 16px; }
+.features-section-note { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
 .features-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
 .feature-card { padding: 15px; border: 1px solid #ecebf0; border-radius: 11px; background: #fcfcfd; }
 .feature-category { display: inline-block; margin-bottom: 8px; color: var(--accent); font-size: 9px; font-weight: 750; letter-spacing: .12em; }

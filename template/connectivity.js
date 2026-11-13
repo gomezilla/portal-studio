@@ -1,11 +1,15 @@
 (function() {
     var indicator = document.getElementById("internet-status");
+    if (indicator && indicator.hidden) indicator = null;
     var dot = document.querySelector('.status-dot:not([data-static="true"])');
     if (!indicator && !dot) return;
 
+    var defaultUrl = "https://ipwho.is/";
+    var legacyUrl = "https://speed.cloudflare.com/__down?bytes=1";
+    var url = document.body.dataset.connectivityUrl || defaultUrl;
     var checking = false;
     function setStatus(connected) {
-        var label = connected ? "Internet access confirmed" : "Internet access not confirmed";
+        var label = connected ? (url === defaultUrl ? "Internet access confirmed" : "Connection check succeeded") : "Connection check not confirmed";
         [indicator, dot].forEach(function(element) {
             if (!element) return;
             element.dataset.online = String(connected);
@@ -24,14 +28,16 @@
         var controller = new AbortController();
         var timer = window.setTimeout(function() { controller.abort(); }, 5000);
         try {
-            var response = await fetch("https://speed.cloudflare.com/__down?bytes=1", {
+            var response = await fetch(url, {
                 cache: "no-store",
                 credentials: "omit",
                 referrerPolicy: "no-referrer",
                 signal: controller.signal
             });
-            var body = await response.arrayBuffer();
-            setStatus(response.ok && body.byteLength === 1 && navigator.onLine);
+            var valid = response.ok && !response.redirected;
+            if (valid && url === defaultUrl) valid = (await response.json()).success === true;
+            if (valid && url === legacyUrl) valid = (await response.arrayBuffer()).byteLength === 1;
+            setStatus(valid && navigator.onLine);
         } catch (error) {
             setStatus(false);
         } finally {

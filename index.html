@@ -247,7 +247,7 @@
               <div class="content-wizard-step" data-content-step="0">
                 <label class="field">Portal name <input data-field="portalName" maxlength="60" placeholder="Prepaid Wi-Fi Access"></label>
                 <div class="field-toggle">
-                  <div><strong>Wi-Fi status icon</strong><span>Shows internet connectivity</span></div>
+                  <div><strong>Wi-Fi status icon</strong><span>Shows the connection check result</span></div>
                   <label class="switch"><input type="checkbox" data-field="showWifiIcon" aria-label="Show Wi-Fi status icon"><span></span></label>
                 </div>
                 <div class="field-toggle">
@@ -259,9 +259,17 @@
                 <div class="field"><span>Logo width</span><div class="percent-control"><input type="range" min="33" max="208" step="1" data-percent-range="brandLogoWidth" aria-label="Logo width percentage"><button type="button" data-percent-step="-1" data-percent-field="brandLogoWidth" aria-label="Decrease logo width">−</button><span class="percent-input"><input type="number" min="33" max="208" step="1" data-percent-number="brandLogoWidth" aria-label="Logo width percentage value"><span aria-hidden="true">%</span></span><button type="button" data-percent-step="1" data-percent-field="brandLogoWidth" aria-label="Increase logo width">+</button></div><span class="field-help">100% is 96 px; new portals default to 85%.</span></div>
                 <label class="field" id="brand-logo-color-field">SVG logo color <input type="color" data-field="brandLogoColor"></label>
                 <div class="field-toggle">
-                  <div><strong>Dynamic status dot</strong><span>Green when internet access is confirmed; gray when offline or the check is blocked. When off, the dot is decorative green.</span></div>
+                  <div><strong>Dynamic status dot</strong><span>Green when the connection check succeeds; gray when offline or blocked. When off, the dot is decorative green.</span></div>
                   <label class="switch"><input type="checkbox" data-field="showDynamicDot" aria-label="Enable dynamic status dot"><span></span></label>
                 </div>
+                <label class="field">Status check address <input id="connectivity-url" type="text" inputmode="url" maxlength="2048" spellcheck="false" aria-describedby="connectivity-url-status connectivity-help"><span class="field-help">Used by both the dynamic dot and Wi-Fi icon. Enter a domain, IP, or full HTTP(S) URL; HTTPS is recommended.</span></label>
+                <div class="preauth-help" id="connectivity-help">
+                  <strong>Allow the status check in Omada</strong>
+                  <p>Add the address below to <b>Omada Controller → Portal → Access Control → Pre-authentication Access</b>. The endpoint must allow cross-origin GET requests and return a successful response without redirecting. A local address checks that endpoint, not necessarily internet access.</p>
+                  <code id="connectivity-host"></code>
+                  <p>Checks expose visitors' IP addresses to the endpoint; do not include secrets in the URL. The indicator can stay gray if the request, CORS, mixed content, or a service rate limit blocks it. The free ipwho.is limit is shared per domain.</p>
+                </div>
+                <p class="field-help" id="connectivity-url-status" role="status"></p>
                 <label class="field">Main headline <input data-field="headline" maxlength="80" placeholder="Get connected."></label>
                 <label class="field">Subheading <textarea data-field="subheading" maxlength="150" rows="2" placeholder="Your connection, ready when you are."></textarea></label>
                 <div class="field-row">
@@ -487,8 +495,9 @@
     <div class="features-heading">
       <p class="eyebrow">PORTAL STUDIO</p>
       <h2 id="features-title">Everything you need to shape your Omada portal</h2>
-      <p>Explore the design, preview, saving, and export tools available to portal creators.</p>
+      <p>Explore tools for portal creators and account administrators.</p>
     </div>
+    <h3 class="features-section-title">User features</h3>
     <div class="features-grid">
       <article class="feature-card">
         <span class="feature-category">CONTENT</span>
@@ -503,7 +512,7 @@
       <article class="feature-card">
         <span class="feature-category">STYLE</span>
         <h3>Start with a visual preset</h3>
-        <p>Choose Main, Material You, Facebook, Bumblebee, YouTube, TikTok, Gaming / Neon, Ocean, Sunset, Forest, Midnight, or Rose. Fine-tune the brand color, light/dark/device color mode, and corner style.</p>
+        <p>Choose a visual style, brand color, light/dark/device mode, SVG background, optional glass effect, logo, and corner style.</p>
       </article>
       <article class="feature-card">
         <span class="feature-category">IMAGES</span>
@@ -518,7 +527,7 @@
       <article class="feature-card">
         <span class="feature-category">SPEED TEST</span>
         <h3>Configure the optional network check</h3>
-        <p>Enable or disable the live upload/download test and ISP lookup. If enabled, add <code>speed.cloudflare.com</code> and <code>ipwho.is</code> to Omada’s Pre-authentication Access Control list.</p>
+        <p>Enable the speed test and ISP lookup, and choose a shared connectivity-check address for the Wi-Fi icon and dynamic dot. Allow the required services in Omada’s pre-authentication access list.</p>
       </article>
       <article class="feature-card">
         <span class="feature-category">DRAFTS</span>
@@ -535,6 +544,12 @@
         <h3>Designed for phones and desktops</h3>
         <p>The editor adapts to smaller screens, though a laptop or desktop is recommended for the most comfortable editing experience. Support and optional donation information are available from the top menu.</p>
       </article>
+    </div>
+    <h3 class="features-section-title">Administrator features</h3>
+    <p class="features-section-note">Administrator and delegated actions require the corresponding permissions.</p>
+    <div class="features-grid">
+      <article class="feature-card"><span class="feature-category">ACCOUNTS</span><h3>Manage accounts and credits</h3><p>Review access and unlock requests, grant template and export credits, and lock or unlock accounts.</p></article>
+      <article class="feature-card"><span class="feature-category">ADMINISTRATION</span><h3>Oversee portals and activity</h3><p>Search user accounts, view portals and audit logs, send broadcast notifications, and delegate specific permissions. Full administrators can manage shared background presets.</p></article>
     </div>
     <div class="features-actions">
       <button class="button button-primary" id="features-done" type="button">Got it</button>

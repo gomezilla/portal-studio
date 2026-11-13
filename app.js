@@ -124,6 +124,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     showHeader: true,
     showDynamicDot: true,
     showWifiIcon: true,
+    connectivityUrl: "https://ipwho.is/",
     showBrandLogo: false,
     brandLogo: "res/img/omada-pro.svg",
     brandLogoColor: "#0a5a5a",
@@ -1943,6 +1944,14 @@ Review and adapt these sample terms to the network operator's actual practices a
     $("#accent-hex").textContent = settings.accentColor.toUpperCase();
     $("#brand-logo-color-field").hidden = settings.brandLogo !== DEFAULTS.brandLogo && !settings.brandLogo.startsWith("data:image/svg+xml;base64,");
     $("#speedtest-preauth-help").hidden = !settings.showSpeedtest;
+    $("#connectivity-url").value = settings.connectivityUrl;
+    $("#connectivity-url-status").textContent = "";
+    try {
+      $("#connectivity-host").textContent = new URL(settings.connectivityUrl).hostname.replace(/^\[|\]$/g, "");
+    } catch (error) {
+      $("#connectivity-host").textContent = "Invalid address";
+      $("#connectivity-url-status").textContent = "The saved status-check address is invalid. Enter a valid address.";
+    }
     renderPercentControls();
     renderBackgrounds();
     renderMessagePromptFields();
@@ -2322,7 +2331,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     return PRESETS.find(preset => preset.id === currentProject.settings.preset) || PRESETS[0];
   }
 
-  function themeCss(settings, mode) {
+  function themeCss(settings, mode, backgroundOverride) {
     const preset = PRESETS.find(item => item.id === settings.preset) || PRESETS[0];
     const accent = isHexColor(settings.accentColor) ? settings.accentColor : preset.accent;
     const light = preset.light;
@@ -2330,7 +2339,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     const corners = { soft: "18px", rounded: "24px", sharp: "8px" };
     const radii = corners[settings.cornerStyle] || corners.soft;
     const glassOpacity = Math.max(50, Math.min(100, Number(settings.glassOpacity) || 85));
-    const background = backgroundSource(settings);
+    const background = backgroundOverride ?? backgroundSource(settings);
     const layers = [];
     const blends = [];
     if (settings.backgroundMatchMode) { layers.push("linear-gradient(var(--background-mode-overlay),var(--background-mode-overlay))"); blends.push("normal"); }
@@ -2355,6 +2364,7 @@ Review and adapt these sample terms to the network operator's actual practices a
 
   function applySettingsToDocument(doc, mode, forPreview = false) {
     const settings = currentProject.settings;
+    doc.body.dataset.connectivityUrl = settings.connectivityUrl;
     const query = selector => doc.querySelector(selector);
     doc.title = settings.portalName || "Wi-Fi Access";
     const setText = (selector, value) => {
@@ -2585,6 +2595,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       const customStyle = doc.createElement("style");
       customStyle.textContent = themeCss(settings, settings.themeMode);
       doc.head.append(customStyle);
+      return customStyle;
     }
   }
 
@@ -2685,6 +2696,7 @@ Review and adapt these sample terms to the network operator's actual practices a
 
   async function buildExportFiles() {
     const doc = new DOMParser().parseFromString(templateHtml, "text/html");
+    const settings = structuredClone(currentProject.settings);
     const customImages = currentProject.images.flatMap((image, index) => {
       if (!image.src.startsWith("data:")) return [];
       return [{ path: getImageSource(image, index, false), data: dataUrlBytes(image.src) }];
@@ -2693,22 +2705,23 @@ Review and adapt these sample terms to the network operator's actual practices a
       if (!image?.src.startsWith("data:")) return [];
       return [{ path: getGuideImageSource(image, index, false), data: dataUrlBytes(image.src) }];
     });
-    applySettingsToDocument(doc, currentProject.settings.themeMode, false);
-    if (!currentProject.settings.showSpeedtest) {
+    const background = backgroundSource(settings);
+    const customStyle = applySettingsToDocument(doc, settings.themeMode, false);
+    if (!settings.showSpeedtest) {
       doc.querySelector('script[src="speedtest.js"]')?.remove();
     }
     const messagesScript = doc.createElement("script");
-    const messagesJson = JSON.stringify(currentProject.settings.errorMessages)
+    const messagesJson = JSON.stringify(settings.errorMessages)
       .replace(/</g, "\\u003c")
       .replace(/\u2028/g, "\\u2028")
       .replace(/\u2029/g, "\\u2029");
     messagesScript.textContent = `window.portalStudioErrorMessages=${messagesJson};`;
     const labels = {
-      3: currentProject.settings.accessLabelVoucher,
-      5: currentProject.settings.accessLabelLocal,
-      6: currentProject.settings.accessLabelSms,
-      8: currentProject.settings.accessLabelRadius,
-      2: currentProject.settings.accessLabelForm
+      3: settings.accessLabelVoucher,
+      5: settings.accessLabelLocal,
+      6: settings.accessLabelSms,
+      8: settings.accessLabelRadius,
+      2: settings.accessLabelForm
     };
     const labelsJson = JSON.stringify(labels).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
     messagesScript.textContent += `window.portalStudioAccessLabels=${labelsJson};`;
@@ -2716,12 +2729,14 @@ Review and adapt these sample terms to the network operator's actual practices a
     if (!authScript) throw new Error("The template authentication script is missing.");
     authScript.before(messagesScript);
 
+    if (BACKGROUNDS.some(option => option.path === background)) {
+      const source = await blobToDataUrl(new Blob([await loadTemplateAsset(background)], { type: "image/svg+xml" }));
+      customStyle.textContent = themeCss(settings, settings.themeMode, source);
+    }
     const customizedHtml = `<!doctype html>\n${doc.documentElement.outerHTML}`;
     const files = [{ path: "index.html", data: new TextEncoder().encode(customizedHtml) }];
     const referencedPaths = new Set();
-    const background = backgroundSource(currentProject.settings);
-    if (BACKGROUNDS.some(option => option.path === background)) referencedPaths.add(background);
-    if (currentProject.settings.showBrandLogo && (!currentProject.settings.brandLogo || currentProject.settings.brandLogo === DEFAULTS.brandLogo)) referencedPaths.add(DEFAULTS.brandLogo);
+    if (settings.showBrandLogo && (!settings.brandLogo || settings.brandLogo === DEFAULTS.brandLogo)) referencedPaths.add(DEFAULTS.brandLogo);
     doc.querySelectorAll("img[src],script[src],link[rel='stylesheet'][href]").forEach(element => {
       const path = element.getAttribute("src") || element.getAttribute("href");
       if (path && !path.startsWith("data:") && !path.startsWith("http")) {
@@ -3642,6 +3657,27 @@ Review and adapt these sample terms to the network operator's actual practices a
     scheduleSave();
   });
   $$(".settings-tab").forEach(tab => tab.addEventListener("click", () => setActiveTab(tab)));
+  $("#connectivity-url").addEventListener("change", event => {
+    const input = event.currentTarget;
+    try {
+      const value = input.value.trim();
+      const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`);
+      if (!value || !["http:", "https:"].includes(url.protocol) || url.username || url.password || url.hash) {
+        throw new Error("Enter an HTTP or HTTPS address without credentials or a fragment.");
+      }
+      currentProject.settings.connectivityUrl = url.href;
+      input.value = url.href;
+      $("#connectivity-host").textContent = url.hostname.replace(/^\[|\]$/g, "");
+      $("#connectivity-url-status").textContent = url.protocol === "http:"
+        ? "HTTP checks may be blocked on HTTPS portals; HTTPS is recommended."
+        : "Address updated. Verify it works before and after authentication.";
+      scheduleSave();
+      updatePreview();
+    } catch (error) {
+      input.value = currentProject.settings.connectivityUrl;
+      $("#connectivity-url-status").textContent = `Address not saved: ${error.message}`;
+    }
+  });
   $$("[data-field]").forEach(input => {
     input.addEventListener(input.type === "checkbox" || input.tagName === "SELECT" || input.type === "color" ? "change" : "input", () => {
       const field = input.dataset.field;
