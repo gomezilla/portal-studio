@@ -256,7 +256,7 @@
                 </div>
                 <label class="field">Logo image <input id="brand-logo-input" type="file" accept="image/svg+xml,image/jpeg,image/png,image/gif,image/webp"><span class="field-help">SVG, JPG, PNG, GIF or WebP, up to 1 MB. Default: Omada Pro.</span></label>
                 <button class="button button-quiet" id="brand-logo-reset" type="button">Restore default logo</button>
-                <div class="field"><span>Logo width</span><div class="percent-control"><input type="range" min="33" max="208" step="1" data-percent-range="brandLogoWidth" aria-label="Logo width percentage"><button type="button" data-percent-step="-1" data-percent-field="brandLogoWidth" aria-label="Decrease logo width">−</button><input type="number" min="33" max="208" step="1" data-percent-number="brandLogoWidth" aria-label="Logo width percentage value"><span>%</span><button type="button" data-percent-step="1" data-percent-field="brandLogoWidth" aria-label="Increase logo width">+</button></div><span class="field-help">100% is the default width of 96 px.</span></div>
+                <div class="field"><span>Logo width</span><div class="percent-control"><input type="range" min="33" max="208" step="1" data-percent-range="brandLogoWidth" aria-label="Logo width percentage"><button type="button" data-percent-step="-1" data-percent-field="brandLogoWidth" aria-label="Decrease logo width">−</button><span class="percent-input"><input type="number" min="33" max="208" step="1" data-percent-number="brandLogoWidth" aria-label="Logo width percentage value"><span aria-hidden="true">%</span></span><button type="button" data-percent-step="1" data-percent-field="brandLogoWidth" aria-label="Increase logo width">+</button></div><span class="field-help">100% is 96 px; new portals default to 85%.</span></div>
                 <label class="field" id="brand-logo-color-field">SVG logo color <input type="color" data-field="brandLogoColor"></label>
                 <div class="field-toggle">
                   <div><strong>Dynamic status dot</strong><span>Green when internet access is confirmed; gray when offline or the check is blocked. When off, the dot is decorative green.</span></div>
@@ -388,10 +388,15 @@
                 <div class="preset-grid" id="preset-grid" role="radiogroup" aria-label="Color and style preset"></div>
               </div>
               <label class="field color-field">Brand color <span class="color-control"><input type="color" data-field="accentColor" aria-label="Choose brand color"><span id="accent-hex">#6750A4</span></span></label>
-              <div class="field"><span class="field-label">Background</span><div class="background-grid" id="background-grid" role="group" aria-label="Portal background"></div><label class="field">Upload SVG background <input id="background-input" type="file" accept=".svg,image/svg+xml"><span class="field-help">SVG only, up to 1 MB. Backgrounds count toward the export size limit.</span></label></div>
+              <div class="field"><span class="field-label">Background</span><div class="background-grid" id="background-grid" role="group" aria-label="Portal background"></div><span class="field-help" id="background-preset-load-status" role="status">Loading presets…</span><label class="field">Upload SVG background <input id="background-input" type="file" accept=".svg,image/svg+xml"><span class="field-help">SVG only, up to 1 MB. Backgrounds count toward the export size limit.</span></label></div>
+              <button class="button button-quiet" id="background-manage-button" type="button" hidden>Manage background presets</button>
               <div class="field-toggle">
                 <div><strong>Match style color</strong><span>Tint the background using the selected brand color.</span></div>
                 <label class="switch"><input type="checkbox" data-field="backgroundMatchStyle" aria-label="Match background to style color"><span></span></label>
+              </div>
+              <div class="field-toggle">
+                <div><strong>Match color mode</strong><span>Lighten or darken the background with the portal color mode.</span></div>
+                <label class="switch"><input type="checkbox" data-field="backgroundMatchMode" aria-label="Match background to color mode"><span></span></label>
               </div>
               <label class="field">Color mode
                 <select data-field="themeMode">
@@ -409,10 +414,10 @@
                 </select>
               </label>
               <div class="field-toggle">
-                <div><strong>Glass effect</strong><span>Translucent, blurred portal panels</span></div>
+                <div><strong>Glass effect</strong><span>Translucent, blurred portal panels and prompts</span></div>
                 <label class="switch"><input type="checkbox" data-field="glassEffect" aria-label="Enable glass effect"><span></span></label>
               </div>
-              <div class="field"><span>Glass opacity</span><div class="percent-control"><input type="range" min="50" max="100" step="1" data-percent-range="glassOpacity" aria-label="Glass opacity percentage"><button type="button" data-percent-step="-1" data-percent-field="glassOpacity" aria-label="Decrease glass opacity">−</button><input type="number" min="50" max="100" step="1" data-percent-number="glassOpacity" aria-label="Glass opacity percentage value"><span>%</span><button type="button" data-percent-step="1" data-percent-field="glassOpacity" aria-label="Increase glass opacity">+</button></div><span class="field-help">50% is more transparent; 100% is opaque.</span></div>
+              <div class="field"><span>Glass opacity</span><div class="percent-control"><input type="range" min="50" max="100" step="1" data-percent-range="glassOpacity" aria-label="Glass opacity percentage"><button type="button" data-percent-step="-1" data-percent-field="glassOpacity" aria-label="Decrease glass opacity">−</button><span class="percent-input"><input type="number" min="50" max="100" step="1" data-percent-number="glassOpacity" aria-label="Glass opacity percentage value"><span aria-hidden="true">%</span></span><button type="button" data-percent-step="1" data-percent-field="glassOpacity" aria-label="Increase glass opacity">+</button></div><span class="field-help">50% is more transparent; 100% is opaque.</span></div>
               <div class="preview-hint"><span aria-hidden="true">✦</span><p>Changes update the live preview. Try the preview theme button to check both color modes.</p></div>
               <div class="content-wizard-navigation"><span>Step 1 of 8</span><button class="button button-primary" id="style-step-next" type="button">Next</button></div>
             </section>
@@ -456,6 +461,18 @@
   </main>
   <footer class="app-footer">Preview only · Authentication activates when deployed to your Omada controller.</footer>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog class="auth-dialog background-presets-dialog" id="background-presets-dialog" aria-labelledby="background-presets-title">
+    <form id="background-presets-form">
+      <button class="dialog-close" id="background-presets-close" type="button" aria-label="Close">×</button>
+      <h2 id="background-presets-title">Background presets</h2>
+      <p class="muted" id="background-presets-description">Presets are available to all signed-in users. Removing one does not change saved portals.</p>
+      <div id="background-presets-list"></div>
+      <label class="field">Preset name <input id="background-preset-name" maxlength="60" required></label>
+      <label class="field">SVG file <input id="background-preset-file" type="file" accept=".svg,image/svg+xml" required><span class="field-help">SVG only, up to 1 MB.</span></label>
+      <button class="button button-primary" id="background-preset-submit" type="submit">Add preset</button>
+      <p class="auth-message" id="background-presets-status" aria-live="polite"></p>
+    </form>
+  </dialog>
   <dialog id="unsaved-dialog" aria-labelledby="unsaved-title">
     <form method="dialog">
       <h2 id="unsaved-title">Unsaved changes</h2>
@@ -551,9 +568,9 @@
       <p class="eyebrow">PORTAL STUDIO ACCOUNT</p>
       <h2 id="auth-title">Sign in to save your work</h2>
       <p class="muted" id="auth-description">Sign in with your email and password. Your saved portals and export allowance follow your account.</p>
-      <label class="field" id="auth-username-field" for="auth-username" hidden>Username<input id="auth-username" type="text" autocomplete="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9_]{3,30}" placeholder="Letters, numbers, or underscores"></label>
+      <label class="field" id="auth-username-field" for="auth-username" hidden>Username<span class="auth-input"><svg class="auth-field-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg><input id="auth-username" type="text" autocomplete="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9_]{3,30}" placeholder="Letters, numbers, or underscores"></span></label>
       <label class="field" for="auth-email">Email address<input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
-      <label class="field" for="auth-password">Password<input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters"></label>
+      <label class="field" for="auth-password">Password<span class="auth-input"><svg class="auth-field-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg><input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters"></span></label>
       <button class="button button-primary" type="submit" id="auth-submit">Sign in</button>
       <p class="auth-message" id="auth-message" aria-live="polite"></p>
       <button class="text-button auth-reset" id="auth-reset" type="button">Forgot password?</button>
@@ -565,7 +582,7 @@
       <p class="eyebrow">PORTAL STUDIO ACCOUNT</p>
       <h2 id="username-title">Choose a username</h2>
       <p class="muted">Choose a unique username of 3–30 letters, numbers, or underscores. Sign-in remains email based.</p>
-      <label class="field" for="username-input">Username<input id="username-input" required minlength="3" maxlength="30" pattern="[A-Za-z0-9_]{3,30}" autocomplete="username"></label>
+      <label class="field" for="username-input">Username<span class="auth-input"><svg class="auth-field-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg><input id="username-input" required minlength="3" maxlength="30" pattern="[A-Za-z0-9_]{3,30}" autocomplete="username"></span></label>
       <button class="button button-primary" type="submit" id="username-submit">Save username</button>
       <p class="auth-message" id="username-message" aria-live="polite"></p>
     </form>
@@ -576,8 +593,8 @@
       <p class="eyebrow">PORTAL STUDIO ACCOUNT</p>
       <h2 id="password-change-title">Change your password</h2>
       <p class="muted">Choose a new password with at least 8 characters.</p>
-      <label class="field" for="new-account-password">New password<input id="new-account-password" type="password" autocomplete="new-password" minlength="8" required></label>
-      <label class="field" for="confirm-account-password">Confirm new password<input id="confirm-account-password" type="password" autocomplete="new-password" minlength="8" required></label>
+      <label class="field" for="new-account-password">New password<span class="auth-input"><svg class="auth-field-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg><input id="new-account-password" type="password" autocomplete="new-password" minlength="8" required></span></label>
+      <label class="field" for="confirm-account-password">Confirm new password<span class="auth-input"><svg class="auth-field-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg><input id="confirm-account-password" type="password" autocomplete="new-password" minlength="8" required></span></label>
       <button class="button button-primary" type="submit" id="password-change-submit">Update password</button>
       <p class="auth-message" id="password-change-message" aria-live="polite"></p>
     </form>

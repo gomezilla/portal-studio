@@ -245,11 +245,13 @@ body {
 .voucher-input { position: relative; }
 .voucher-icon { position: absolute; top: 50%; left: 13px; width: 20px; height: 20px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 #voucherCode { padding-left: 43px; }
-.password-wrapper { position: relative; }
-.password-toggle { position: absolute; top: 27px; right: 8px; min-height: 32px; padding: 6px 8px; border: 0; border-radius: 7px; background: transparent; box-shadow: none; color: var(--primary); cursor: pointer; font: inherit; font-size: 12px; font-weight: 650; }
-.password-toggle:hover { transform: none; background: var(--primary-soft); box-shadow: none; }
+.field-icon-input { position: relative; }
+.field-icon { position: absolute; top: 50%; left: 13px; width: 20px; height: 20px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.field-icon-input #username, .field-icon-input #password, .field-icon-input #simplePassword { padding-left: 43px; }
+.password-toggle { position: absolute; top: 50%; right: 8px; min-height: 32px; padding: 6px 8px; border: 0; border-radius: 7px; background: transparent; box-shadow: none; color: var(--primary); cursor: pointer; font: inherit; font-size: 12px; font-weight: 650; transform: translateY(-50%); }
+.password-toggle:hover { transform: translateY(-50%); background: var(--primary-soft); box-shadow: none; }
 .password-toggle:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 1px; }
-.password-wrapper input { padding-right: 68px; }
+.password-wrapper #password { padding-right: 68px; }
 .verify-row { display: flex; gap: 8px; }
 #verify-code { min-width: 0; }
 

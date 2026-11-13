@@ -94,16 +94,25 @@
                                 </div>
                                 <div id="input-user" class="form-group" style="display:none">
                                     <label class="field-label" for="username">Username</label>
-                                    <input id="username" class="oper-section-item input" name="username" type="text" placeholder="Username" autocomplete="username">
+                                    <div class="field-icon-input">
+                                        <svg class="field-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg>
+                                        <input id="username" class="oper-section-item input" name="username" type="text" placeholder="Username" autocomplete="username">
+                                    </div>
                                 </div>
-                                <div id="input-password" class="form-group password-wrapper" style="display:none">
+                                <div id="input-password" class="form-group" style="display:none">
                                     <label class="field-label" for="password">Password</label>
-                                    <input id="password" class="oper-section-item input" name="password" type="password" placeholder="Password" autocomplete="current-password">
-                                    <button id="togglePassword" class="password-toggle" type="button" aria-controls="password" aria-pressed="false">Show</button>
+                                    <div class="field-icon-input password-wrapper">
+                                        <svg class="field-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg>
+                                        <input id="password" class="oper-section-item input" name="password" type="password" placeholder="Password" autocomplete="current-password">
+                                        <button id="togglePassword" class="password-toggle" type="button" aria-controls="password" aria-pressed="false">Show</button>
+                                    </div>
                                 </div>
                                 <div id="input-simple" class="form-group" style="display:none">
                                     <label class="field-label" for="simplePassword">Wi-Fi password</label>
-                                    <input id="simplePassword" class="password oper-section-item" name="simplePassword" type="password" placeholder="Enter Wi-Fi password">
+                                    <div class="field-icon-input">
+                                        <svg class="field-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg>
+                                        <input id="simplePassword" class="password oper-section-item" name="simplePassword" type="password" placeholder="Enter Wi-Fi password">
+                                    </div>
                                 </div>
                                 <div id="input-phone-num" class="form-group" style="display:none">
                                     <label class="field-label" for="country-code">Country code</label>

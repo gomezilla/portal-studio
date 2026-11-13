@@ -399,6 +399,43 @@ as $$
   );
 $$;
 
+create table if not exists public.portal_background_presets (
+  id text primary key,
+  name text not null check (length(trim(name)) between 1 and 60),
+  source text not null,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  check (
+    (id in ('res/img/backgrounds/animated.svg', 'res/img/backgrounds/pattern.svg') and source = id)
+    or (
+      id ~ '^preset:[a-z0-9-]{8,50}$'
+      and length(source) <= 1398130
+      and source ~ '^data:image/svg[+]xml;base64,[A-Za-z0-9+/]+={0,2}$'
+      and octet_length(decode(substr(source, 27), 'base64')) between 1 and 1048576
+    )
+  )
+);
+alter table public.portal_background_presets enable row level security;
+drop policy if exists "Users read active background presets" on public.portal_background_presets;
+create policy "Users read active background presets" on public.portal_background_presets
+  for select to authenticated using (active or public.is_portal_admin());
+drop policy if exists "Admins insert background presets" on public.portal_background_presets;
+create policy "Admins insert background presets" on public.portal_background_presets
+  for insert to authenticated with check (auth.uid() is not null and public.is_portal_admin());
+drop policy if exists "Admins update background presets" on public.portal_background_presets;
+create policy "Admins update background presets" on public.portal_background_presets
+  for update to authenticated using (auth.uid() is not null and public.is_portal_admin())
+  with check (auth.uid() is not null and public.is_portal_admin());
+drop policy if exists "Admins delete background presets" on public.portal_background_presets;
+create policy "Admins delete background presets" on public.portal_background_presets
+  for delete to authenticated using (auth.uid() is not null and public.is_portal_admin());
+revoke all on public.portal_background_presets from public, anon;
+grant select, insert, update, delete on public.portal_background_presets to authenticated;
+insert into public.portal_background_presets(id, name, source) values
+  ('res/img/backgrounds/animated.svg', 'Animated', 'res/img/backgrounds/animated.svg'),
+  ('res/img/backgrounds/pattern.svg', 'Pattern', 'res/img/backgrounds/pattern.svg')
+on conflict (id) do nothing;
+
 create or replace function public.has_portal_permission(p_permission text)
 returns boolean language sql stable security definer set search_path = public, auth as $$
   select auth.uid() is not null and (

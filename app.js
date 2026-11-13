@@ -127,12 +127,14 @@ Review and adapt these sample terms to the network operator's actual practices a
     showBrandLogo: false,
     brandLogo: "res/img/omada-pro.svg",
     brandLogoColor: "#0a5a5a",
-    brandLogoWidth: 96,
+    brandLogoWidth: 81.6,
     glassEffect: false,
     glassOpacity: 85,
     backgroundImage: "",
     backgroundCustom: "",
+    backgroundPresetSource: "",
     backgroundMatchStyle: true,
+    backgroundMatchMode: true,
     showGallery: true,
     showTerms: false,
     showSpeedtest: true,
@@ -212,6 +214,9 @@ Review and adapt these sample terms to the network operator's actual practices a
   let toastTimer = 0;
   let sizeCheckTimer = 0;
   let backgroundUploadSequence = 0;
+  let backgroundPresets = [];
+  let backgroundPresetLoadSequence = 0;
+  let backgroundPresetBusy = false;
   let previewThemeOverride = null;
   let previewDevice = "mobile";
   let previewZoom = null;
@@ -943,11 +948,11 @@ Review and adapt these sample terms to the network operator's actual practices a
       : `${greeting}.`;
   }
 
-  async function fetchNotificationRows(queryFactory) {
+  async function fetchNotificationRows(queryFactory, pageSize = 500) {
     const rows = [];
     let offset = 0;
     for (;;) {
-      const { data, error } = await queryFactory().range(offset, offset + 499);
+      const { data, error } = await queryFactory().range(offset, offset + pageSize - 1);
       if (error) throw error;
       if (!data.length) return rows;
       rows.push(...data);
@@ -1292,7 +1297,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(reader.error || new Error("Could not read a saved gallery image."));
+      reader.onerror = () => reject(reader.error || new Error("Could not read image data."));
       reader.readAsDataURL(blob);
     });
   }
@@ -1755,6 +1760,8 @@ Review and adapt these sample terms to the network operator's actual practices a
     $$("[data-preview-method]").forEach(input => { input.checked = previewMethods.has(input.dataset.previewMethod); });
     setContentWizardStep(0);
     renderFields();
+    $("#background-manage-button").hidden = !(OFFLINE_MODE || isAdmin);
+    refreshBackgroundPresets();
     syncAccent();
     renderPlanRows();
     renderImageSlots();
@@ -1941,8 +1948,105 @@ Review and adapt these sample terms to the network operator's actual practices a
     renderMessagePromptFields();
   }
 
+  async function readSvgBackground(file) {
+    if (!file || file.size > MAX_IMAGE_BYTES || (!/\.svg$/i.test(file.name) && file.type !== "image/svg+xml")) {
+      throw new Error("Choose an SVG background up to 1 MB.");
+    }
+    const text = await file.text();
+    const svg = new DOMParser().parseFromString(text, "image/svg+xml");
+    if (svg.documentElement.localName !== "svg" || svg.documentElement.namespaceURI !== "http://www.w3.org/2000/svg" || svg.querySelector("parsererror")) {
+      throw new Error("The file is not a valid SVG.");
+    }
+    return blobToDataUrl(new Blob([file], { type: "image/svg+xml" }));
+  }
+
+  async function refreshBackgroundPresets() {
+    const sequence = ++backgroundPresetLoadSequence;
+    const userId = currentUser?.id;
+    $("#background-preset-load-status").textContent = "Loading presets…";
+    $("#background-manage-button").disabled = true;
+    try {
+      let presets;
+      if (OFFLINE_MODE) {
+        presets = await getLocalSetting("background-presets");
+        if (presets === undefined) presets = BACKGROUNDS.map(item => ({ id: item.path, name: item.name, source: item.path }));
+      } else {
+        if (!userId) throw new Error("Sign in to load shared background presets.");
+        presets = await fetchNotificationRows(() => supabaseClient.from("portal_background_presets")
+          .select("id,name,source").eq("active", true).order("id"), 10);
+      }
+      if (sequence !== backgroundPresetLoadSequence || (!OFFLINE_MODE && currentUser?.id !== userId)) return false;
+      if (!Array.isArray(presets) || presets.some(item => !item || typeof item.id !== "string" || typeof item.name !== "string" || !backgroundSource({ backgroundImage: item.source }))) {
+        throw new Error("A saved background preset is invalid.");
+      }
+      backgroundPresets = presets;
+      $("#background-preset-load-status").textContent = "";
+      $("#background-manage-button").disabled = false;
+      if (currentProject && !editorView.hidden) renderBackgrounds();
+      return true;
+    } catch (error) {
+      if (sequence !== backgroundPresetLoadSequence) return false;
+      backgroundPresets = BACKGROUNDS.map(item => ({ id: item.path, name: item.name, source: item.path }));
+      $("#background-preset-load-status").textContent = `Shared presets unavailable; showing built-in backgrounds: ${error.message}`;
+      if (currentProject && !editorView.hidden) renderBackgrounds();
+      showToast(`Could not load background presets: ${error.message}`, true);
+      return false;
+    }
+  }
+
+  function setBackgroundPresetBusy(busy) {
+    backgroundPresetBusy = busy;
+    $("#background-preset-submit").disabled = busy;
+    $$("[data-remove-background]", $("#background-presets-list")).forEach(button => { button.disabled = busy; });
+  }
+
+  function renderBackgroundPresetManager() {
+    const list = $("#background-presets-list");
+    list.replaceChildren();
+    backgroundPresets.forEach(preset => {
+      const row = document.createElement("div");
+      row.className = "preset-manager-row";
+      const name = document.createElement("span");
+      name.textContent = preset.name;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "button button-quiet";
+      remove.dataset.removeBackground = preset.id;
+      remove.textContent = "Remove";
+      remove.setAttribute("aria-label", `Remove ${preset.name} background`);
+      remove.disabled = backgroundPresetBusy;
+      remove.addEventListener("click", async () => {
+        if (backgroundPresetBusy || !window.confirm(`Remove "${preset.name}" from background presets? Saved portals will keep their background.`)) return;
+        setBackgroundPresetBusy(true);
+        try {
+          if (OFFLINE_MODE) {
+            await setLocalSetting("background-presets", backgroundPresets.filter(item => item.id !== preset.id));
+          } else {
+            if (!isAdmin) throw new Error("Administrator access is required.");
+            const query = BACKGROUNDS.some(item => item.path === preset.id)
+              ? supabaseClient.from("portal_background_presets").update({ active: false })
+              : supabaseClient.from("portal_background_presets").delete();
+            const { error } = await query.eq("id", preset.id).select("id").single();
+            if (error) throw error;
+          }
+          if (await refreshBackgroundPresets()) {
+            renderBackgroundPresetManager();
+            $("#background-presets-status").textContent = "Preset removed.";
+          }
+        } catch (error) {
+          $("#background-presets-status").textContent = `Could not remove preset: ${error.message}`;
+        } finally {
+          setBackgroundPresetBusy(false);
+        }
+      });
+      row.append(name, remove);
+      list.append(row);
+    });
+  }
+
   function backgroundSource(settings) {
-    const source = settings.backgroundImage === "custom" ? settings.backgroundCustom : settings.backgroundImage;
+    const source = settings.backgroundImage === "custom" ? settings.backgroundCustom
+      : typeof settings.backgroundImage === "string" && settings.backgroundImage.startsWith("preset:") ? settings.backgroundPresetSource : settings.backgroundImage;
     return BACKGROUNDS.some(background => background.path === source) ||
       (typeof source === "string" && /^data:image\/svg\+xml;base64,[a-z0-9+/=]+$/i.test(source)) ? source : "";
   }
@@ -1951,11 +2055,14 @@ Review and adapt these sample terms to the network operator's actual practices a
     const grid = $("#background-grid");
     const restoreFocus = grid.contains(document.activeElement);
     const source = backgroundSource(currentProject.settings);
-    const selected = source.startsWith("data:") ? "custom" : source;
-    const options = [{ path: "", name: "None" }, ...BACKGROUNDS];
-    const custom = backgroundSource({ backgroundImage: currentProject.settings.backgroundCustom }) || (source.startsWith("data:") ? source : "");
+    const selected = typeof currentProject.settings.backgroundImage === "string" && currentProject.settings.backgroundImage.startsWith("preset:")
+      ? currentProject.settings.backgroundImage : source.startsWith("data:") ? "custom" : source;
+    const options = [{ path: "", name: "None" }, ...backgroundPresets.map(preset => ({ path: preset.id, name: preset.name, source: preset.source }))];
+    const custom = backgroundSource({ backgroundImage: currentProject.settings.backgroundCustom });
     if (custom) options.push({ path: "custom", name: "Custom", source: custom });
+    if (source && !options.some(option => option.path === selected)) options.push({ path: selected, name: "Saved background", source });
     grid.style.setProperty("--background-tint", isHexColor(currentProject.settings.accentColor) ? currentProject.settings.accentColor : DEFAULTS.accentColor);
+    grid.style.setProperty("--background-mode-overlay", isPreviewDark() ? "rgba(0,0,0,.5)" : "rgba(255,255,255,.4)");
     grid.replaceChildren();
     options.forEach(option => {
       const button = document.createElement("button");
@@ -1966,8 +2073,10 @@ Review and adapt these sample terms to the network operator's actual practices a
         const thumb = document.createElement("span");
         thumb.className = "background-thumb";
         thumb.dataset.tinted = String(currentProject.settings.backgroundMatchStyle);
+        thumb.dataset.mode = String(currentProject.settings.backgroundMatchMode);
         const image = document.createElement("img");
-        image.src = option.source || `template/${option.path}`;
+        const imageSource = option.source || option.path;
+        image.src = imageSource.startsWith("data:") ? imageSource : `template/${imageSource}`;
         image.alt = "";
         thumb.append(image);
         button.append(thumb);
@@ -1980,6 +2089,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       button.addEventListener("click", () => {
         backgroundUploadSequence += 1;
         currentProject.settings.backgroundImage = option.path;
+        if (option.path.startsWith("preset:")) currentProject.settings.backgroundPresetSource = option.source;
         renderBackgrounds();
         scheduleSave();
         updatePreview();
@@ -2221,19 +2331,24 @@ Review and adapt these sample terms to the network operator's actual practices a
     const radii = corners[settings.cornerStyle] || corners.soft;
     const glassOpacity = Math.max(50, Math.min(100, Number(settings.glassOpacity) || 85));
     const background = backgroundSource(settings);
+    const layers = [];
+    const blends = [];
+    if (settings.backgroundMatchMode) { layers.push("linear-gradient(var(--background-mode-overlay),var(--background-mode-overlay))"); blends.push("normal"); }
+    if (settings.backgroundMatchStyle) { layers.push(`linear-gradient(${accent},${accent})`); blends.push("color"); }
+    if (background) { layers.push(`url(${JSON.stringify(background)})`); blends.push("normal"); }
     const vars = palette => `--page:${palette[0]};--surface:${palette[1]};--surface-soft:${palette[2]};--surface-tint:${palette[3]};--text:${palette[4]};--muted:${palette[5]};--border:${palette[6]};--primary:${accent};--primary-hover:${preset.hover};--primary-soft:${accent}22;--focus-ring:${accent}30;`;
-    return `:root{${vars(light)}--portal-radius:${radii};}
-      :root[data-theme="dark"]{${vars(dark)}color-scheme:dark;}
+    return `:root{${vars(light)}--portal-radius:${radii};--background-mode-overlay:rgba(255,255,255,.4);}
+      :root[data-theme="dark"]{${vars(dark)}--background-mode-overlay:rgba(0,0,0,.5);color-scheme:dark;}
       :root[data-theme="light"]{${vars(light)}color-scheme:light;}
-      @media(prefers-color-scheme:dark){:root[data-theme="system"]{${vars(dark)}color-scheme:dark;}}
+      @media(prefers-color-scheme:dark){:root[data-theme="system"]{${vars(dark)}--background-mode-overlay:rgba(0,0,0,.5);color-scheme:dark;}}
       @media(prefers-color-scheme:light){:root[data-theme="system"]{${vars(light)}color-scheme:light;}}
       .container{border-radius:var(--portal-radius)!important}
       .carousel,.speed-card,.access-column{border-radius:calc(var(--portal-radius) * .72)!important}
       .portal-badge,.collapsible{border-radius:calc(var(--portal-radius) * .45)!important}
       .button,#button-login,#get-code{background-color:var(--primary)!important}
       .button:hover,#button-login:hover,#get-code:hover{background-color:var(--primary-hover)!important}
-      ${background ? `body{background-image:${settings.backgroundMatchStyle ? `linear-gradient(${accent},${accent}),` : ""}url(${JSON.stringify(background)});background-color:var(--page);background-position:center;background-size:cover;background-repeat:no-repeat;background-attachment:fixed;background-blend-mode:${settings.backgroundMatchStyle ? "color,normal" : "normal"}}` : ""}
-      ${settings.glassEffect ? `.container,.access-column,.speed-card{background:color-mix(in srgb,var(--surface) ${glassOpacity}%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}.access-column,.speed-card{background:color-mix(in srgb,var(--surface-soft) ${glassOpacity}%,transparent)}` : ""}
+      ${background ? `body{background-image:${layers.join(",")};background-color:var(--page);background-position:center;background-size:cover;background-repeat:no-repeat;background-attachment:fixed;background-blend-mode:${blends.join(",")}}` : ""}
+      ${settings.glassEffect ? `.container,.access-column,.speed-card,.info-dialog,.message-dialog,.terms-dialog{background:color-mix(in srgb,var(--surface) ${glassOpacity}%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}.access-column,.speed-card{background:color-mix(in srgb,var(--surface-soft) ${glassOpacity}%,transparent)}` : ""}
       ${preset.id === "bumblebee" ? `.button,#button-login,#get-code,.hotspot-tabs button.active{color:${contrastingText(accent)}!important}:root[data-theme="light"] .portal-badge,:root[data-theme="light"] .terms-link{color:#755100}:root[data-theme="system"] .portal-badge,:root[data-theme="system"] .terms-link{color:#755100}@media(prefers-color-scheme:dark){:root[data-theme="system"] .portal-badge,:root[data-theme="system"] .terms-link{color:var(--primary)}}` : ""}
       ${preset.id === "gaming" ? `.container{box-shadow:0 24px 70px rgba(0,0,0,.5),0 0 34px ${accent}35!important}.portal-badge{border-color:${accent}66!important}.button,#button-login,#get-code{box-shadow:0 0 20px ${accent}55!important}` : ""}`;
   }
@@ -2539,6 +2654,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     button.innerHTML = isPreviewDark()
       ? '<span aria-hidden="true">☾</span> Preview light mode'
       : '<span aria-hidden="true">☼</span> Preview dark mode';
+    renderBackgrounds();
   }
 
   function showThankYou(action) {
@@ -2893,6 +3009,8 @@ Review and adapt these sample terms to the network operator's actual practices a
             }
           }, 0);
         } else if (event === "SIGNED_OUT") {
+          backgroundPresetLoadSequence += 1;
+          backgroundPresets = [];
           currentUser = null;
           currentUsername = "";
           projects = [];
@@ -3448,6 +3566,46 @@ Review and adapt these sample terms to the network operator's actual practices a
   });
   $("#top-save-button").addEventListener("click", () => saveCurrentProject());
   $("#export-button").addEventListener("click", exportProject);
+  $("#background-manage-button").addEventListener("click", () => {
+    if (!OFFLINE_MODE && !isAdmin) {
+      showToast("Administrator access is required.", true);
+      return;
+    }
+    $("#background-presets-description").textContent = OFFLINE_MODE
+      ? "Presets are stored in this browser. Removing one does not change saved portals."
+      : "Presets are available to all signed-in users. Removing one does not change saved portals.";
+    $("#background-presets-status").textContent = "";
+    renderBackgroundPresetManager();
+    $("#background-presets-dialog").showModal();
+  });
+  $("#background-presets-close").addEventListener("click", () => $("#background-presets-dialog").close());
+  $("#background-presets-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    if (backgroundPresetBusy) return;
+    setBackgroundPresetBusy(true);
+    try {
+      if (!OFFLINE_MODE && !isAdmin) throw new Error("Administrator access is required.");
+      const name = $("#background-preset-name").value.trim();
+      if (!name) throw new Error("Enter a preset name.");
+      const source = await readSvgBackground($("#background-preset-file").files[0]);
+      const preset = { id: `preset:${makeId()}`, name, source };
+      if (OFFLINE_MODE) {
+        await setLocalSetting("background-presets", [...backgroundPresets, preset]);
+      } else {
+        const { error } = await supabaseClient.from("portal_background_presets").insert(preset).select("id").single();
+        if (error) throw error;
+      }
+      if (await refreshBackgroundPresets()) {
+        renderBackgroundPresetManager();
+        $("#background-presets-form").reset();
+        $("#background-presets-status").textContent = "Preset added.";
+      }
+    } catch (error) {
+      $("#background-presets-status").textContent = `Could not add preset: ${error.message}`;
+    } finally {
+      setBackgroundPresetBusy(false);
+    }
+  });
   $$("[data-percent-range]").forEach(range => {
     range.addEventListener("input", () => setPercent(range.dataset.percentRange, range.valueAsNumber));
   });
@@ -3465,30 +3623,17 @@ Review and adapt these sample terms to the network operator's actual practices a
     event.currentTarget.value = "";
     if (!file) return;
     const sequence = ++backgroundUploadSequence;
-    if (file.size > MAX_IMAGE_BYTES || (!/\.svg$/i.test(file.name) && file.type !== "image/svg+xml")) {
-      showToast("Choose an SVG background up to 1 MB.", true);
-      return;
-    }
     const project = currentProject;
     try {
-      const text = await file.text();
-      const svg = new DOMParser().parseFromString(text, "image/svg+xml");
-      if (svg.documentElement.localName !== "svg" || svg.documentElement.namespaceURI !== "http://www.w3.org/2000/svg" || svg.querySelector("parsererror")) {
-        throw new Error("The file is not a valid SVG.");
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (currentProject !== project || editorView.hidden || sequence !== backgroundUploadSequence) return;
-        currentProject.settings.backgroundImage = "custom";
-        currentProject.settings.backgroundCustom = reader.result;
-        renderBackgrounds();
-        scheduleSave();
-        updatePreview();
-      };
-      reader.onerror = () => showToast("Could not read the SVG background.", true);
-      reader.readAsDataURL(new Blob([file], { type: "image/svg+xml" }));
+      const source = await readSvgBackground(file);
+      if (currentProject !== project || editorView.hidden || sequence !== backgroundUploadSequence) return;
+      currentProject.settings.backgroundImage = "custom";
+      currentProject.settings.backgroundCustom = source;
+      renderBackgrounds();
+      scheduleSave();
+      updatePreview();
     } catch (error) {
-      showToast(`Could not use this background: ${error.message}`, true);
+      if (sequence === backgroundUploadSequence) showToast(`Could not use this background: ${error.message}`, true);
     }
   });
   $("#project-name").addEventListener("input", () => {
@@ -3504,7 +3649,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       if (field === "showBrandLogo" && input.checked) currentProject.settings.showWifiIcon = false;
       if (field === "showWifiIcon" && input.checked) currentProject.settings.showBrandLogo = false;
       if (field === "showBrandLogo" || field === "showWifiIcon") renderFields();
-      if (field === "backgroundMatchStyle" || field === "accentColor") renderBackgrounds();
+      if (field === "backgroundMatchStyle" || field === "backgroundMatchMode" || field === "accentColor") renderBackgrounds();
       if (field === "themeMode") {
         previewThemeOverride = null;
         setPreviewThemeButton();
