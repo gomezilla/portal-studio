@@ -58,7 +58,7 @@
   };
   const TEMPLATE_FILES = [
     "index.js", "light.css", "dark.css", "speedtest.js", "connectivity.js", "tabCollapsible.js",
-    "res/img/image1.jpg", "res/img/image2.jpeg", "res/img/image3.jpeg", "res/img/image4.jpg", "res/img/image5.jpeg",
+    "res/img/image1.jpg", "res/img/image2.jpeg", "res/img/image3.jpeg", "res/img/image4.jpg", "res/img/image5.jpeg", "res/img/omada-pro.svg",
     ...GUIDE_IMAGE_PATHS
   ];
   const DEFAULTS = {
@@ -118,6 +118,14 @@ Contact the network operator for help or questions about these terms. The operat
 SAMPLE TERMS
 Review and adapt these sample terms to the network operator's actual practices and applicable laws. This sample is not legal advice.`,
     showHeader: true,
+    showDynamicDot: true,
+    showWifiIcon: true,
+    showBrandLogo: false,
+    brandLogo: "res/img/omada-pro.svg",
+    brandLogoColor: "#0a5a5a",
+    brandLogoWidth: 96,
+    glassEffect: false,
+    glassOpacity: 85,
     showGallery: true,
     showTerms: false,
     showSpeedtest: true,
@@ -188,11 +196,16 @@ Review and adapt these sample terms to the network operator's actual practices a
   const remoteDraftIds = new Set();
   let projects = [];
   let dirty = false;
+  let editRevision = 0;
+  let savedProject = null;
+  let saveInProgress = null;
+  let autosave = true;
+  let leavePromptPending = false;
   let saveTimer = 0;
   let toastTimer = 0;
   let sizeCheckTimer = 0;
   let previewThemeOverride = null;
-  let previewDevice = "desktop";
+  let previewDevice = "mobile";
   let previewZoom = null;
   let previewMethods = new Set(["3"]);
   let passwordRecoveryPromptShown = false;
@@ -764,15 +777,24 @@ Review and adapt these sample terms to the network operator's actual practices a
 
   function setDirty(isDirty) {
     dirty = isDirty;
+    if (isDirty) editRevision += 1;
     saveIndicator.classList.toggle("unsaved", isDirty);
     saveIndicator.lastChild.textContent = isDirty ? " Unsaved changes" : " All changes saved";
-    if (isDirty) {
+    $("#draft-save-status").textContent = isDirty ? "Unsaved changes" : "All changes saved";
+    if (isDirty && autosave) {
       window.clearTimeout(saveTimer);
-      saveTimer = window.setTimeout(() => saveCurrentProject(true), 800);
+      saveTimer = window.setTimeout(() => saveCurrentProject(true, true), 800);
     }
   }
 
-  async function saveCurrentProject(silent = false) {
+  async function saveCurrentProject(silent = false, automatic = false) {
+    let waited = false;
+    while (saveInProgress) {
+      await saveInProgress;
+      waited = true;
+    }
+    if (automatic && !autosave) return false;
+    if (waited && !dirty) return true;
     if (!currentProject || (!OFFLINE_MODE && (!currentUser || !quota))) return false;
     if (currentProject.readOnlyAdminView) {
       showToast("Delegated portal access is read-only.", true);
@@ -782,21 +804,31 @@ Review and adapt these sample terms to the network operator's actual practices a
     window.clearTimeout(saveTimer);
     currentProject.name = ($("#project-name").value.trim() || "Untitled Wi-Fi Portal").slice(0, 70);
     currentProject.updatedAt = new Date().toISOString();
+    const project = currentProject;
+    const snapshot = structuredClone(project);
+    const revision = editRevision;
+    let finish;
+    saveInProgress = new Promise(resolve => { finish = resolve; });
     try {
-      if (OFFLINE_MODE) await storeLocalProject(currentProject);
-      else await persistCloudProject(currentProject);
-      dirty = false;
-      saveIndicator.classList.remove("unsaved");
-      saveIndicator.lastChild.textContent = " All changes saved";
+      if (OFFLINE_MODE) await storeLocalProject(snapshot);
+      else await persistCloudProject(snapshot);
+      if (currentProject === project) {
+        savedProject = structuredClone(snapshot);
+        if (revision === editRevision) setDirty(false);
+      }
       renderDashboard();
-      if (!silent) showToast(OFFLINE_MODE ? "Draft saved in this browser." : "Draft saved to your account.");
+      if (!silent) showToast(dirty ? "Draft saved; newer changes are still unsaved." : OFFLINE_MODE ? "Draft saved in this browser." : "Draft saved to your account.");
       return true;
     } catch (error) {
       dirty = true;
       saveIndicator.classList.add("unsaved");
       saveIndicator.lastChild.textContent = " Save failed";
+      $("#draft-save-status").textContent = "Save failed";
       showToast(`Could not save this draft: ${error.message}`, true);
       return false;
+    } finally {
+      saveInProgress = null;
+      finish();
     }
   }
 
@@ -1523,6 +1555,7 @@ Review and adapt these sample terms to the network operator's actual practices a
   function normalizeProject(project) {
     const defaultSettings = JSON.parse(JSON.stringify(DEFAULTS));
     const settings = { ...defaultSettings, ...(project.settings || {}) };
+    if (typeof settings.brandLogo !== "string" || !settings.brandLogo) settings.brandLogo = DEFAULTS.brandLogo;
     settings.guideSteps = Array.isArray(project.settings?.guideSteps)
       ? project.settings.guideSteps.slice(0, MAX_GUIDE_STEPS)
       : [settings.guideStep1, settings.guideStep2, settings.guideStep3];
@@ -1634,6 +1667,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       Object.assign(project, { locked: updated.locked, updatedAt: updated.updatedAt });
       renderDashboard();
       if (currentProject === project && !editorView.hidden) {
+        if (savedProject) Object.assign(savedProject, { locked: updated.locked, updatedAt: updated.updatedAt });
         updateEditorLockState();
         if (!project.locked) $("#project-name").focus();
       }
@@ -1688,12 +1722,18 @@ Review and adapt these sample terms to the network operator's actual practices a
     const readOnly = locked || Boolean(currentProject.readOnlyAdminView);
     $("#project-name").readOnly = readOnly;
     $(".settings-panel").inert = readOnly;
-    $(".draft-autosave").textContent = currentProject.readOnlyAdminView ? "Read-only · delegated access" : locked ? "Locked · read-only" : "Draft autosaves";
+    $("#autosave-toggle").disabled = readOnly;
+    $("#manual-save-button").disabled = readOnly;
+    $("#draft-save-status").textContent = readOnly ? "Locked or read-only" : dirty ? "Unsaved changes" : "All changes saved";
     $("#top-save-button").disabled = readOnly;
     $("#editor-unlock-button").hidden = !locked || Boolean(currentProject.readOnlyAdminView);
   }
 
   function openEditor() {
+    savedProject = structuredClone(currentProject);
+    autosave = currentProject.autosaveEnabled !== false;
+    $("#autosave-toggle").checked = autosave;
+    $("#manual-save-button").hidden = autosave;
     dashboardView.hidden = true;
     adminDashboardView.hidden = true;
     editorView.hidden = false;
@@ -1713,15 +1753,36 @@ Review and adapt these sample terms to the network operator's actual practices a
     renderPresets();
     previewThemeOverride = null;
     setPreviewThemeButton();
-    setPreviewDevice("desktop");
+    setPreviewDevice("mobile");
     setDirty(false);
+    updateEditorLockState();
     updatePreview();
     queueExportSizeCheck();
     window.scrollTo(0, 0);
   }
 
-  function showDashboard() {
-    if (dirty) saveCurrentProject(true);
+  async function showDashboard() {
+    while (saveInProgress) await saveInProgress;
+    if (!editorView.hidden && dirty) {
+      if (autosave) {
+        if (!await saveCurrentProject(true) || dirty) return;
+      } else {
+        const dialog = $("#unsaved-dialog");
+        if (leavePromptPending) return;
+        leavePromptPending = true;
+        dialog.returnValue = "";
+        dialog.showModal();
+        const choice = await new Promise(resolve => dialog.addEventListener("close", () => resolve(dialog.returnValue), { once: true }));
+        leavePromptPending = false;
+        if (choice === "save") {
+          if (!await saveCurrentProject(true) || dirty) return;
+        } else if (choice === "discard") {
+          if (saveInProgress) await saveInProgress;
+          Object.assign(currentProject, structuredClone(savedProject));
+          setDirty(false);
+        } else return;
+      }
+    }
     document.body.classList.remove("editor-active");
     editorView.hidden = true;
     $("#top-save-button").hidden = true;
@@ -1864,6 +1925,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       else input.value = value ?? "";
     });
     $("#accent-hex").textContent = settings.accentColor.toUpperCase();
+    $("#brand-logo-color-field").hidden = settings.brandLogo !== DEFAULTS.brandLogo && !settings.brandLogo.startsWith("data:image/svg+xml;base64,");
     $("#speedtest-preauth-help").hidden = !settings.showSpeedtest;
     renderMessagePromptFields();
   }
@@ -2031,7 +2093,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       button.addEventListener("click", () => {
         currentProject.settings.preset = preset.id;
         currentProject.settings.accentColor = preset.accent;
-        currentProject.settings.themeMode = preset.mode;
+        currentProject.settings.themeMode = "system";
         currentProject.settings.cornerStyle = preset.corners;
         previewThemeOverride = null;
         renderPresets();
@@ -2071,6 +2133,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     const dark = preset.dark;
     const corners = { soft: "18px", rounded: "24px", sharp: "8px" };
     const radii = corners[settings.cornerStyle] || corners.soft;
+    const glassOpacity = Math.max(50, Math.min(100, Number(settings.glassOpacity) || 85));
     const vars = palette => `--page:${palette[0]};--surface:${palette[1]};--surface-soft:${palette[2]};--surface-tint:${palette[3]};--text:${palette[4]};--muted:${palette[5]};--border:${palette[6]};--primary:${accent};--primary-hover:${preset.hover};--primary-soft:${accent}22;--focus-ring:${accent}30;`;
     return `:root{${vars(light)}--portal-radius:${radii};}
       :root[data-theme="dark"]{${vars(dark)}color-scheme:dark;}
@@ -2082,6 +2145,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       .portal-badge,.collapsible{border-radius:calc(var(--portal-radius) * .45)!important}
       .button,#button-login,#get-code{background-color:var(--primary)!important}
       .button:hover,#button-login:hover,#get-code:hover{background-color:var(--primary-hover)!important}
+      ${settings.glassEffect ? `.container,.access-column,.speed-card{background:color-mix(in srgb,var(--surface) ${glassOpacity}%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}.access-column,.speed-card{background:color-mix(in srgb,var(--surface-soft) ${glassOpacity}%,transparent)}` : ""}
       ${preset.id === "bumblebee" ? `.button,#button-login,#get-code,.hotspot-tabs button.active{color:${contrastingText(accent)}!important}:root[data-theme="light"] .portal-badge,:root[data-theme="light"] .terms-link{color:#755100}:root[data-theme="system"] .portal-badge,:root[data-theme="system"] .terms-link{color:#755100}@media(prefers-color-scheme:dark){:root[data-theme="system"] .portal-badge,:root[data-theme="system"] .terms-link{color:var(--primary)}}` : ""}
       ${preset.id === "gaming" ? `.container{box-shadow:0 24px 70px rgba(0,0,0,.5),0 0 34px ${accent}35!important}.portal-badge{border-color:${accent}66!important}.button,#button-login,#get-code{box-shadow:0 0 20px ${accent}55!important}` : ""}`;
   }
@@ -2096,9 +2160,31 @@ Review and adapt these sample terms to the network operator's actual practices a
     };
     const badge = query(".portal-badge");
     if (badge) {
+      const dot = badge.querySelector(".status-dot");
+      if (dot) dot.hidden = settings.showDynamicDot === false;
       const labelNode = Array.from(badge.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
       if (labelNode) labelNode.textContent = settings.portalName;
       else badge.append(doc.createTextNode(settings.portalName));
+    }
+    const wifi = query("#internet-status");
+    const logo = query("#brand-logo");
+    if (wifi) wifi.hidden = settings.showWifiIcon === false || settings.showBrandLogo === true;
+    if (logo && settings.showBrandLogo) {
+      logo.hidden = false;
+      const width = Math.max(32, Math.min(200, Number(settings.brandLogoWidth) || 96));
+      logo.style.width = `${width}px`;
+      logo.style.height = `${Math.round(width * 5 / 12)}px`;
+      const source = settings.brandLogo || DEFAULTS.brandLogo;
+      if (source === DEFAULTS.brandLogo || source.startsWith("data:image/svg+xml;base64,")) {
+        logo.style.backgroundColor = isHexColor(settings.brandLogoColor) ? settings.brandLogoColor : DEFAULTS.brandLogoColor;
+        logo.style.maskImage = `url(${JSON.stringify(source)})`;
+        logo.style.webkitMaskImage = `url(${JSON.stringify(source)})`;
+      } else {
+        const image = doc.createElement("img");
+        image.src = source;
+        image.alt = "";
+        logo.append(image);
+      }
     }
     setText(".portal-title", settings.headline);
     setText(".portal-subtitle", settings.subheading);
@@ -2420,6 +2506,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     const customizedHtml = `<!doctype html>\n${doc.documentElement.outerHTML}`;
     const files = [{ path: "index.html", data: new TextEncoder().encode(customizedHtml) }];
     const referencedPaths = new Set();
+    if (currentProject.settings.showBrandLogo && (!currentProject.settings.brandLogo || currentProject.settings.brandLogo === DEFAULTS.brandLogo)) referencedPaths.add(DEFAULTS.brandLogo);
     doc.querySelectorAll("img[src],script[src],link[rel='stylesheet'][href]").forEach(element => {
       const path = element.getAttribute("src") || element.getAttribute("href");
       if (path && !path.startsWith("data:") && !path.startsWith("http")) {
@@ -2512,7 +2599,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     button.disabled = true;
     button.textContent = "Preparing ZIP…";
     try {
-      if (!await saveCurrentProject(true)) throw new Error("Save the portal before exporting.");
+      if (!await saveCurrentProject(true) || dirty) throw new Error("Save all changes before exporting; try again after editing.");
       const files = await buildExportFiles();
       const size = zipSizeBytes(files);
       if (size >= MAX_EXPORT_BYTES) {
@@ -3223,6 +3310,40 @@ Review and adapt these sample terms to the network operator's actual practices a
     showDashboard();
   });
   $("#back-button").addEventListener("click", showDashboard);
+  $("#manual-save-button").addEventListener("click", () => saveCurrentProject());
+  $("#autosave-toggle").addEventListener("change", async event => {
+    const toggle = event.currentTarget;
+    const project = currentProject;
+    const previous = autosave;
+    const enabled = toggle.checked;
+    autosave = enabled;
+    toggle.disabled = true;
+    window.clearTimeout(saveTimer);
+    while (saveInProgress) await saveInProgress;
+    const snapshot = structuredClone(savedProject);
+    snapshot.autosaveEnabled = enabled;
+    let finish;
+    saveInProgress = new Promise(resolve => { finish = resolve; });
+    try {
+      if (OFFLINE_MODE) await storeLocalProject(snapshot);
+      else await persistCloudProject(snapshot);
+      project.autosaveEnabled = enabled;
+      if (currentProject === project) savedProject = structuredClone(snapshot);
+      $("#manual-save-button").hidden = enabled;
+    } catch (error) {
+      autosave = previous;
+      toggle.checked = previous;
+      showToast(`Could not save autosave preference: ${error.message}`, true);
+    } finally {
+      saveInProgress = null;
+      finish();
+      toggle.disabled = Boolean(currentProject?.locked || currentProject?.readOnlyAdminView);
+      if (autosave && dirty) saveCurrentProject(true, true);
+    }
+  });
+  window.addEventListener("beforeunload", event => {
+    if (dirty && !editorView.hidden) { event.preventDefault(); event.returnValue = ""; }
+  });
   $("#editor-unlock-button").addEventListener("click", event => {
     if (currentProject?.locked) toggleProjectLock(currentProject, event.currentTarget);
   });
@@ -3238,6 +3359,9 @@ Review and adapt these sample terms to the network operator's actual practices a
     input.addEventListener(input.type === "checkbox" || input.tagName === "SELECT" || input.type === "color" ? "change" : "input", () => {
       const field = input.dataset.field;
       currentProject.settings[field] = input.type === "checkbox" ? input.checked : input.value;
+      if (field === "showBrandLogo" && input.checked) currentProject.settings.showWifiIcon = false;
+      if (field === "showWifiIcon" && input.checked) currentProject.settings.showBrandLogo = false;
+      if (field === "showBrandLogo" || field === "showWifiIcon") renderFields();
       if (field === "themeMode") {
         previewThemeOverride = null;
         setPreviewThemeButton();
@@ -3252,6 +3376,32 @@ Review and adapt these sample terms to the network operator's actual practices a
       scheduleSave();
       updatePreview();
     });
+  });
+  $("#brand-logo-input").addEventListener("change", event => {
+    const file = event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > MAX_IMAGE_BYTES || !["image/svg+xml", "image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
+      showToast("Choose an SVG, JPG, PNG, GIF or WebP logo up to 1 MB.", true);
+      return;
+    }
+    const project = currentProject;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (currentProject !== project || editorView.hidden) return;
+      currentProject.settings.brandLogo = reader.result;
+      renderFields();
+      scheduleSave();
+      updatePreview();
+    };
+    reader.onerror = () => showToast("Could not read the logo file.", true);
+    reader.readAsDataURL(file);
+  });
+  $("#brand-logo-reset").addEventListener("click", () => {
+    currentProject.settings.brandLogo = DEFAULTS.brandLogo;
+    renderFields();
+    scheduleSave();
+    updatePreview();
   });
   $("#add-plan-button").addEventListener("click", () => {
     if (currentProject.settings.plans.length >= 20) {

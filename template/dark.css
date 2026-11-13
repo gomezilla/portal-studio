@@ -57,6 +57,9 @@ body {
 .internet-status { display: inline-flex; flex: 0 0 auto; color: #9299a4; }
 .internet-status[data-online="true"] { color: #40d397; }
 .internet-status svg { width: 23px; height: 23px; }
+.internet-status[hidden], .brand-logo[hidden] { display: none; }
+.brand-logo { display: block; flex: 0 0 auto; max-width: 45%; height: 40px; mask-repeat: no-repeat; mask-position: center; mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center; -webkit-mask-size: contain; }
+.brand-logo img { width: 100%; height: 100%; object-fit: contain; }
 
 .portal-badge, .speed-live {
     display: inline-flex;
@@ -82,6 +85,9 @@ body {
     border-radius: 50%;
     background: var(--download);
 }
+.status-dot { background: #9299a4; }
+.status-dot[data-online="true"] { background: #159b63; }
+.status-dot[hidden] { display: none; }
 
 .portal-title {
     margin: 12px 0 4px;

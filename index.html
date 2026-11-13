@@ -221,7 +221,9 @@
           <span class="draft-tag">DRAFT</span>
         </div>
         <div class="editor-actions">
-          <span class="draft-autosave">Draft autosaves</span>
+          <label class="draft-autosave"><input id="autosave-toggle" type="checkbox" checked> Autosave</label>
+          <span id="draft-save-status" role="status">All changes saved</span>
+          <button class="button button-quiet" id="manual-save-button" type="button" hidden>Save draft</button>
           <button class="button button-quiet" id="editor-unlock-button" type="button" hidden>Unlock to edit</button>
           <button class="button button-primary" id="export-button" type="button"><span aria-hidden="true">↓</span> Export ZIP</button>
         </div>
@@ -244,6 +246,22 @@
               </div>
               <div class="content-wizard-step" data-content-step="0">
                 <label class="field">Portal name <input data-field="portalName" maxlength="60" placeholder="Prepaid Wi-Fi Access"></label>
+                <div class="field-toggle">
+                  <div><strong>Wi-Fi status icon</strong><span>Shows internet connectivity</span></div>
+                  <label class="switch"><input type="checkbox" data-field="showWifiIcon" aria-label="Show Wi-Fi status icon"><span></span></label>
+                </div>
+                <div class="field-toggle">
+                  <div><strong>Brand logo</strong><span>Replaces the Wi-Fi icon; both can be hidden</span></div>
+                  <label class="switch"><input type="checkbox" data-field="showBrandLogo" aria-label="Show brand logo"><span></span></label>
+                </div>
+                <label class="field">Logo image <input id="brand-logo-input" type="file" accept="image/svg+xml,image/jpeg,image/png,image/gif,image/webp"><span class="field-help">SVG, JPG, PNG, GIF or WebP, up to 1 MB. Default: Omada Pro.</span></label>
+                <button class="button button-quiet" id="brand-logo-reset" type="button">Restore default logo</button>
+                <label class="field">Logo width <input type="range" min="32" max="200" data-field="brandLogoWidth"></label>
+                <label class="field" id="brand-logo-color-field">SVG logo color <input type="color" data-field="brandLogoColor"></label>
+                <div class="field-toggle">
+                  <div><strong>Dynamic status dot</strong><span>Green when internet access is confirmed; gray when offline or the check is blocked.</span></div>
+                  <label class="switch"><input type="checkbox" data-field="showDynamicDot" aria-label="Show dynamic status dot"><span></span></label>
+                </div>
                 <label class="field">Main headline <input data-field="headline" maxlength="80" placeholder="Get connected."></label>
                 <label class="field">Subheading <textarea data-field="subheading" maxlength="150" rows="2" placeholder="Your connection, ready when you are."></textarea></label>
                 <div class="field-row">
@@ -385,6 +403,11 @@
                   <option value="sharp">Sharp · minimal</option>
                 </select>
               </label>
+              <div class="field-toggle">
+                <div><strong>Glass effect</strong><span>Translucent, blurred portal panels</span></div>
+                <label class="switch"><input type="checkbox" data-field="glassEffect" aria-label="Enable glass effect"><span></span></label>
+              </div>
+              <label class="field">Glass opacity <input type="range" min="50" max="100" step="1" data-field="glassOpacity"><span class="field-help">50% is more transparent; 100% is opaque.</span></label>
               <div class="preview-hint"><span aria-hidden="true">✦</span><p>Changes update the live preview. Try the preview theme button to check both color modes.</p></div>
               <div class="content-wizard-navigation"><span>Step 1 of 8</span><button class="button button-primary" id="style-step-next" type="button">Next</button></div>
             </section>
@@ -404,8 +427,8 @@
             <div class="preview-heading"><span class="live-indicator"></span><strong>Live preview</strong></div>
             <div class="preview-toolbar-actions">
               <div class="preview-device-switch" role="group" aria-label="Preview device">
-                <button class="preview-device-button" type="button" data-preview-device="mobile" aria-pressed="false">Mobile</button>
-                <button class="preview-device-button active" type="button" data-preview-device="desktop" aria-pressed="true">Desktop</button>
+                <button class="preview-device-button active" type="button" data-preview-device="mobile" aria-pressed="true">Mobile</button>
+                <button class="preview-device-button" type="button" data-preview-device="desktop" aria-pressed="false">Desktop</button>
               </div>
               <div class="preview-zoom" role="group" aria-label="Preview zoom">
                 <button type="button" id="preview-zoom-out" aria-label="Zoom out">−</button>
@@ -417,7 +440,7 @@
             </div>
           </div>
           <div class="preview-canvas">
-            <div class="browser-frame desktop">
+            <div class="browser-frame mobile">
               <div class="browser-top" aria-hidden="true"><span class="traffic-lights"><i></i><i></i><i></i></span><span class="address-bar">Portal preview</span><span class="frame-menu">•••</span></div>
               <iframe id="portal-preview" title="Live preview of your Omada Wi-Fi portal"></iframe>
             </div>
@@ -428,6 +451,15 @@
   </main>
   <footer class="app-footer">Preview only · Authentication activates when deployed to your Omada controller.</footer>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog id="unsaved-dialog" aria-labelledby="unsaved-title">
+    <form method="dialog">
+      <h2 id="unsaved-title">Unsaved changes</h2>
+      <p>Save your changes before leaving, discard them, or continue editing.</p>
+      <button value="cancel" class="button button-quiet">Continue editing</button>
+      <button value="discard" class="button button-quiet">Discard</button>
+      <button value="save" class="button button-primary">Save draft</button>
+    </form>
+  </dialog>
   <dialog class="features-dialog" id="features-dialog" aria-labelledby="features-title">
     <button class="dialog-close" id="features-close" type="button" aria-label="Close features">×</button>
     <div class="features-heading">

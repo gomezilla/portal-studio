@@ -1,13 +1,17 @@
 (function() {
     var indicator = document.getElementById("internet-status");
-    if (!indicator) return;
+    var dot = document.querySelector(".status-dot");
+    if (!indicator && !dot) return;
 
     var checking = false;
     function setStatus(connected) {
         var label = connected ? "Internet access confirmed" : "Internet access not confirmed";
-        indicator.dataset.online = String(connected);
-        indicator.setAttribute("aria-label", label);
-        indicator.title = label;
+        [indicator, dot].forEach(function(element) {
+            if (!element) return;
+            element.dataset.online = String(connected);
+            element.setAttribute("aria-label", label);
+            element.title = label;
+        });
     }
 
     async function checkInternet() {
