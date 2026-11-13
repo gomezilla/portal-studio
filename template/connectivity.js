@@ -1,6 +1,6 @@
 (function() {
     var indicator = document.getElementById("internet-status");
-    var dot = document.querySelector(".status-dot");
+    var dot = document.querySelector('.status-dot:not([data-static="true"])');
     if (!indicator && !dot) return;
 
     var checking = false;

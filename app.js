@@ -13,6 +13,10 @@
     "res/img/instr/instr2.jpeg",
     "res/img/instr/instr3.jpeg"
   ];
+  const BACKGROUNDS = [
+    { path: "res/img/backgrounds/animated.svg", name: "Animated" },
+    { path: "res/img/backgrounds/pattern.svg", name: "Pattern" }
+  ];
   const MAX_GALLERY_IMAGES = 20;
   const MAX_IMAGE_BYTES = 1_048_576;
   const MAX_GUIDE_IMAGE_BYTES = 500_000;
@@ -59,7 +63,7 @@
   const TEMPLATE_FILES = [
     "index.js", "light.css", "dark.css", "speedtest.js", "connectivity.js", "tabCollapsible.js",
     "res/img/image1.jpg", "res/img/image2.jpeg", "res/img/image3.jpeg", "res/img/image4.jpg", "res/img/image5.jpeg", "res/img/omada-pro.svg",
-    ...GUIDE_IMAGE_PATHS
+    ...GUIDE_IMAGE_PATHS, ...BACKGROUNDS.map(background => background.path)
   ];
   const DEFAULTS = {
     portalName: "Prepaid Wi-Fi Access",
@@ -126,6 +130,9 @@ Review and adapt these sample terms to the network operator's actual practices a
     brandLogoWidth: 96,
     glassEffect: false,
     glassOpacity: 85,
+    backgroundImage: "",
+    backgroundCustom: "",
+    backgroundMatchStyle: true,
     showGallery: true,
     showTerms: false,
     showSpeedtest: true,
@@ -204,6 +211,7 @@ Review and adapt these sample terms to the network operator's actual practices a
   let saveTimer = 0;
   let toastTimer = 0;
   let sizeCheckTimer = 0;
+  let backgroundUploadSequence = 0;
   let previewThemeOverride = null;
   let previewDevice = "mobile";
   let previewZoom = null;
@@ -1730,6 +1738,7 @@ Review and adapt these sample terms to the network operator's actual practices a
   }
 
   function openEditor() {
+    backgroundUploadSequence += 1;
     savedProject = structuredClone(currentProject);
     autosave = currentProject.autosaveEnabled !== false;
     $("#autosave-toggle").checked = autosave;
@@ -1927,7 +1936,84 @@ Review and adapt these sample terms to the network operator's actual practices a
     $("#accent-hex").textContent = settings.accentColor.toUpperCase();
     $("#brand-logo-color-field").hidden = settings.brandLogo !== DEFAULTS.brandLogo && !settings.brandLogo.startsWith("data:image/svg+xml;base64,");
     $("#speedtest-preauth-help").hidden = !settings.showSpeedtest;
+    renderPercentControls();
+    renderBackgrounds();
     renderMessagePromptFields();
+  }
+
+  function backgroundSource(settings) {
+    const source = settings.backgroundImage === "custom" ? settings.backgroundCustom : settings.backgroundImage;
+    return BACKGROUNDS.some(background => background.path === source) ||
+      (typeof source === "string" && /^data:image\/svg\+xml;base64,[a-z0-9+/=]+$/i.test(source)) ? source : "";
+  }
+
+  function renderBackgrounds() {
+    const grid = $("#background-grid");
+    const restoreFocus = grid.contains(document.activeElement);
+    const source = backgroundSource(currentProject.settings);
+    const selected = source.startsWith("data:") ? "custom" : source;
+    const options = [{ path: "", name: "None" }, ...BACKGROUNDS];
+    const custom = backgroundSource({ backgroundImage: currentProject.settings.backgroundCustom }) || (source.startsWith("data:") ? source : "");
+    if (custom) options.push({ path: "custom", name: "Custom", source: custom });
+    grid.style.setProperty("--background-tint", isHexColor(currentProject.settings.accentColor) ? currentProject.settings.accentColor : DEFAULTS.accentColor);
+    grid.replaceChildren();
+    options.forEach(option => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "background-option";
+      button.setAttribute("aria-pressed", String(selected === option.path));
+      if (option.path) {
+        const thumb = document.createElement("span");
+        thumb.className = "background-thumb";
+        thumb.dataset.tinted = String(currentProject.settings.backgroundMatchStyle);
+        const image = document.createElement("img");
+        image.src = option.source || `template/${option.path}`;
+        image.alt = "";
+        thumb.append(image);
+        button.append(thumb);
+      } else {
+        const empty = document.createElement("span");
+        empty.className = "background-empty";
+        button.append(empty);
+      }
+      button.append(document.createTextNode(option.name));
+      button.addEventListener("click", () => {
+        backgroundUploadSequence += 1;
+        currentProject.settings.backgroundImage = option.path;
+        renderBackgrounds();
+        scheduleSave();
+        updatePreview();
+      });
+      grid.append(button);
+    });
+    if (restoreFocus) grid.querySelector('[aria-pressed="true"]')?.focus();
+  }
+
+  function percentValue(field) {
+    const value = Number(currentProject.settings[field]) || DEFAULTS[field];
+    return field === "brandLogoWidth" ? Math.round(value / 96 * 100) : value;
+  }
+
+  function renderPercentControls() {
+    $$("[data-percent-range]").forEach(range => {
+      const value = Math.max(Number(range.min), Math.min(Number(range.max), percentValue(range.dataset.percentRange)));
+      range.value = value;
+      $(`[data-percent-number="${range.dataset.percentRange}"]`).value = value;
+    });
+  }
+
+  function setPercent(field, value) {
+    const range = $(`[data-percent-range="${field}"]`);
+    if (!Number.isFinite(value)) {
+      showToast("Enter a valid percentage.", true);
+      renderPercentControls();
+      return;
+    }
+    const percent = Math.max(Number(range.min), Math.min(Number(range.max), Math.round(value)));
+    currentProject.settings[field] = field === "brandLogoWidth" ? percent * 96 / 100 : percent;
+    renderPercentControls();
+    scheduleSave();
+    updatePreview();
   }
 
   function renderMessagePromptFields() {
@@ -2134,6 +2220,7 @@ Review and adapt these sample terms to the network operator's actual practices a
     const corners = { soft: "18px", rounded: "24px", sharp: "8px" };
     const radii = corners[settings.cornerStyle] || corners.soft;
     const glassOpacity = Math.max(50, Math.min(100, Number(settings.glassOpacity) || 85));
+    const background = backgroundSource(settings);
     const vars = palette => `--page:${palette[0]};--surface:${palette[1]};--surface-soft:${palette[2]};--surface-tint:${palette[3]};--text:${palette[4]};--muted:${palette[5]};--border:${palette[6]};--primary:${accent};--primary-hover:${preset.hover};--primary-soft:${accent}22;--focus-ring:${accent}30;`;
     return `:root{${vars(light)}--portal-radius:${radii};}
       :root[data-theme="dark"]{${vars(dark)}color-scheme:dark;}
@@ -2145,6 +2232,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       .portal-badge,.collapsible{border-radius:calc(var(--portal-radius) * .45)!important}
       .button,#button-login,#get-code{background-color:var(--primary)!important}
       .button:hover,#button-login:hover,#get-code:hover{background-color:var(--primary-hover)!important}
+      ${background ? `body{background-image:${settings.backgroundMatchStyle ? `linear-gradient(${accent},${accent}),` : ""}url(${JSON.stringify(background)});background-color:var(--page);background-position:center;background-size:cover;background-repeat:no-repeat;background-attachment:fixed;background-blend-mode:${settings.backgroundMatchStyle ? "color,normal" : "normal"}}` : ""}
       ${settings.glassEffect ? `.container,.access-column,.speed-card{background:color-mix(in srgb,var(--surface) ${glassOpacity}%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}.access-column,.speed-card{background:color-mix(in srgb,var(--surface-soft) ${glassOpacity}%,transparent)}` : ""}
       ${preset.id === "bumblebee" ? `.button,#button-login,#get-code,.hotspot-tabs button.active{color:${contrastingText(accent)}!important}:root[data-theme="light"] .portal-badge,:root[data-theme="light"] .terms-link{color:#755100}:root[data-theme="system"] .portal-badge,:root[data-theme="system"] .terms-link{color:#755100}@media(prefers-color-scheme:dark){:root[data-theme="system"] .portal-badge,:root[data-theme="system"] .terms-link{color:var(--primary)}}` : ""}
       ${preset.id === "gaming" ? `.container{box-shadow:0 24px 70px rgba(0,0,0,.5),0 0 34px ${accent}35!important}.portal-badge{border-color:${accent}66!important}.button,#button-login,#get-code{box-shadow:0 0 20px ${accent}55!important}` : ""}`;
@@ -2161,7 +2249,12 @@ Review and adapt these sample terms to the network operator's actual practices a
     const badge = query(".portal-badge");
     if (badge) {
       const dot = badge.querySelector(".status-dot");
-      if (dot) dot.hidden = settings.showDynamicDot === false;
+      if (dot && settings.showDynamicDot === false) {
+        dot.dataset.static = "true";
+        dot.dataset.online = "true";
+        dot.setAttribute("aria-label", "Decorative status dot, not an internet indicator");
+        dot.title = "Decorative status dot, not an internet indicator";
+      }
       const labelNode = Array.from(badge.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
       if (labelNode) labelNode.textContent = settings.portalName;
       else badge.append(doc.createTextNode(settings.portalName));
@@ -2398,7 +2491,11 @@ Review and adapt these sample terms to the network operator's actual practices a
 
   previewFrame.addEventListener("load", () => {
     const body = previewFrame.contentDocument?.body;
-    if (body) $(".preview-canvas").style.background = previewFrame.contentWindow.getComputedStyle(body).background;
+    if (body) {
+      const style = previewFrame.contentWindow.getComputedStyle(body);
+      $(".preview-canvas").style.background = style.background;
+      $(".preview-canvas").style.backgroundBlendMode = style.backgroundBlendMode;
+    }
   });
 
   function updatePreviewScale() {
@@ -2506,6 +2603,8 @@ Review and adapt these sample terms to the network operator's actual practices a
     const customizedHtml = `<!doctype html>\n${doc.documentElement.outerHTML}`;
     const files = [{ path: "index.html", data: new TextEncoder().encode(customizedHtml) }];
     const referencedPaths = new Set();
+    const background = backgroundSource(currentProject.settings);
+    if (BACKGROUNDS.some(option => option.path === background)) referencedPaths.add(background);
     if (currentProject.settings.showBrandLogo && (!currentProject.settings.brandLogo || currentProject.settings.brandLogo === DEFAULTS.brandLogo)) referencedPaths.add(DEFAULTS.brandLogo);
     doc.querySelectorAll("img[src],script[src],link[rel='stylesheet'][href]").forEach(element => {
       const path = element.getAttribute("src") || element.getAttribute("href");
@@ -3349,6 +3448,49 @@ Review and adapt these sample terms to the network operator's actual practices a
   });
   $("#top-save-button").addEventListener("click", () => saveCurrentProject());
   $("#export-button").addEventListener("click", exportProject);
+  $$("[data-percent-range]").forEach(range => {
+    range.addEventListener("input", () => setPercent(range.dataset.percentRange, range.valueAsNumber));
+  });
+  $$("[data-percent-number]").forEach(input => {
+    input.addEventListener("change", () => setPercent(input.dataset.percentNumber, input.valueAsNumber));
+  });
+  $$("[data-percent-step]").forEach(button => {
+    button.addEventListener("click", () => {
+      const field = button.dataset.percentField;
+      setPercent(field, percentValue(field) + Number(button.dataset.percentStep));
+    });
+  });
+  $("#background-input").addEventListener("change", async event => {
+    const file = event.currentTarget.files[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    const sequence = ++backgroundUploadSequence;
+    if (file.size > MAX_IMAGE_BYTES || (!/\.svg$/i.test(file.name) && file.type !== "image/svg+xml")) {
+      showToast("Choose an SVG background up to 1 MB.", true);
+      return;
+    }
+    const project = currentProject;
+    try {
+      const text = await file.text();
+      const svg = new DOMParser().parseFromString(text, "image/svg+xml");
+      if (svg.documentElement.localName !== "svg" || svg.documentElement.namespaceURI !== "http://www.w3.org/2000/svg" || svg.querySelector("parsererror")) {
+        throw new Error("The file is not a valid SVG.");
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (currentProject !== project || editorView.hidden || sequence !== backgroundUploadSequence) return;
+        currentProject.settings.backgroundImage = "custom";
+        currentProject.settings.backgroundCustom = reader.result;
+        renderBackgrounds();
+        scheduleSave();
+        updatePreview();
+      };
+      reader.onerror = () => showToast("Could not read the SVG background.", true);
+      reader.readAsDataURL(new Blob([file], { type: "image/svg+xml" }));
+    } catch (error) {
+      showToast(`Could not use this background: ${error.message}`, true);
+    }
+  });
   $("#project-name").addEventListener("input", () => {
     if (!currentProject) return;
     currentProject.name = $("#project-name").value;
@@ -3362,6 +3504,7 @@ Review and adapt these sample terms to the network operator's actual practices a
       if (field === "showBrandLogo" && input.checked) currentProject.settings.showWifiIcon = false;
       if (field === "showWifiIcon" && input.checked) currentProject.settings.showBrandLogo = false;
       if (field === "showBrandLogo" || field === "showWifiIcon") renderFields();
+      if (field === "backgroundMatchStyle" || field === "accentColor") renderBackgrounds();
       if (field === "themeMode") {
         previewThemeOverride = null;
         setPreviewThemeButton();

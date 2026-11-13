@@ -221,7 +221,7 @@
           <span class="draft-tag">DRAFT</span>
         </div>
         <div class="editor-actions">
-          <label class="draft-autosave"><input id="autosave-toggle" type="checkbox" checked> Autosave</label>
+          <div class="draft-autosave"><span>Autosave</span><label class="switch"><input id="autosave-toggle" type="checkbox" role="switch" aria-label="Autosave" checked><span></span></label></div>
           <span id="draft-save-status" role="status">All changes saved</span>
           <button class="button button-quiet" id="manual-save-button" type="button" hidden>Save draft</button>
           <button class="button button-quiet" id="editor-unlock-button" type="button" hidden>Unlock to edit</button>
@@ -256,11 +256,11 @@
                 </div>
                 <label class="field">Logo image <input id="brand-logo-input" type="file" accept="image/svg+xml,image/jpeg,image/png,image/gif,image/webp"><span class="field-help">SVG, JPG, PNG, GIF or WebP, up to 1 MB. Default: Omada Pro.</span></label>
                 <button class="button button-quiet" id="brand-logo-reset" type="button">Restore default logo</button>
-                <label class="field">Logo width <input type="range" min="32" max="200" data-field="brandLogoWidth"></label>
+                <div class="field"><span>Logo width</span><div class="percent-control"><input type="range" min="33" max="208" step="1" data-percent-range="brandLogoWidth" aria-label="Logo width percentage"><button type="button" data-percent-step="-1" data-percent-field="brandLogoWidth" aria-label="Decrease logo width">−</button><input type="number" min="33" max="208" step="1" data-percent-number="brandLogoWidth" aria-label="Logo width percentage value"><span>%</span><button type="button" data-percent-step="1" data-percent-field="brandLogoWidth" aria-label="Increase logo width">+</button></div><span class="field-help">100% is the default width of 96 px.</span></div>
                 <label class="field" id="brand-logo-color-field">SVG logo color <input type="color" data-field="brandLogoColor"></label>
                 <div class="field-toggle">
-                  <div><strong>Dynamic status dot</strong><span>Green when internet access is confirmed; gray when offline or the check is blocked.</span></div>
-                  <label class="switch"><input type="checkbox" data-field="showDynamicDot" aria-label="Show dynamic status dot"><span></span></label>
+                  <div><strong>Dynamic status dot</strong><span>Green when internet access is confirmed; gray when offline or the check is blocked. When off, the dot is decorative green.</span></div>
+                  <label class="switch"><input type="checkbox" data-field="showDynamicDot" aria-label="Enable dynamic status dot"><span></span></label>
                 </div>
                 <label class="field">Main headline <input data-field="headline" maxlength="80" placeholder="Get connected."></label>
                 <label class="field">Subheading <textarea data-field="subheading" maxlength="150" rows="2" placeholder="Your connection, ready when you are."></textarea></label>
@@ -388,6 +388,11 @@
                 <div class="preset-grid" id="preset-grid" role="radiogroup" aria-label="Color and style preset"></div>
               </div>
               <label class="field color-field">Brand color <span class="color-control"><input type="color" data-field="accentColor" aria-label="Choose brand color"><span id="accent-hex">#6750A4</span></span></label>
+              <div class="field"><span class="field-label">Background</span><div class="background-grid" id="background-grid" role="group" aria-label="Portal background"></div><label class="field">Upload SVG background <input id="background-input" type="file" accept=".svg,image/svg+xml"><span class="field-help">SVG only, up to 1 MB. Backgrounds count toward the export size limit.</span></label></div>
+              <div class="field-toggle">
+                <div><strong>Match style color</strong><span>Tint the background using the selected brand color.</span></div>
+                <label class="switch"><input type="checkbox" data-field="backgroundMatchStyle" aria-label="Match background to style color"><span></span></label>
+              </div>
               <label class="field">Color mode
                 <select data-field="themeMode">
                   <option value="system">Auto · match device</option>
@@ -407,7 +412,7 @@
                 <div><strong>Glass effect</strong><span>Translucent, blurred portal panels</span></div>
                 <label class="switch"><input type="checkbox" data-field="glassEffect" aria-label="Enable glass effect"><span></span></label>
               </div>
-              <label class="field">Glass opacity <input type="range" min="50" max="100" step="1" data-field="glassOpacity"><span class="field-help">50% is more transparent; 100% is opaque.</span></label>
+              <div class="field"><span>Glass opacity</span><div class="percent-control"><input type="range" min="50" max="100" step="1" data-percent-range="glassOpacity" aria-label="Glass opacity percentage"><button type="button" data-percent-step="-1" data-percent-field="glassOpacity" aria-label="Decrease glass opacity">−</button><input type="number" min="50" max="100" step="1" data-percent-number="glassOpacity" aria-label="Glass opacity percentage value"><span>%</span><button type="button" data-percent-step="1" data-percent-field="glassOpacity" aria-label="Increase glass opacity">+</button></div><span class="field-help">50% is more transparent; 100% is opaque.</span></div>
               <div class="preview-hint"><span aria-hidden="true">✦</span><p>Changes update the live preview. Try the preview theme button to check both color modes.</p></div>
               <div class="content-wizard-navigation"><span>Step 1 of 8</span><button class="button button-primary" id="style-step-next" type="button">Next</button></div>
             </section>
